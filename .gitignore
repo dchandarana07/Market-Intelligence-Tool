@@ -5,6 +5,7 @@
 !railway.json
 config/google-credentials.json
 config/oauth_token.pickle
+config/oauth_client.json
 
 # Python
 __pycache__/

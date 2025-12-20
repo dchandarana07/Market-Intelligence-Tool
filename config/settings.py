@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     google_credentials_path: Path = Path("./config/google-credentials.json")
     google_drive_folder_id: str = ""
 
+    # Google OAuth for Sign-In
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_client_config: Path = Path("./config/oauth_client.json")
+
     # -----------------
     # SerpAPI (Google Jobs)
     # -----------------

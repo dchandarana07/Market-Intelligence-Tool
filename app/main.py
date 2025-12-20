@@ -17,11 +17,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+import secrets
 
 from config.settings import settings
 from app.services.orchestrator import get_orchestrator, PipelineStatus
 from app.services.email import get_email_service
 from app.services.google_sheets import get_sheets_service
+from app.services.auth import get_auth_service
+from app.middleware.auth import AuthMiddleware
 
 # Configure logging - Set to DEBUG for detailed module logging
 LOG_LEVEL = logging.DEBUG if settings.debug else logging.INFO
@@ -70,6 +73,9 @@ app.add_middleware(
     max_age=3600,  # 1 hour session
 )
 
+# Add authentication middleware
+app.add_middleware(AuthMiddleware)
+
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -100,14 +106,108 @@ def clear_session_data(request: Request) -> None:
 
 
 # ============================================================================
+# Authentication Routes
+# ============================================================================
+
+@app.get("/auth/login", response_class=HTMLResponse)
+async def auth_login(request: Request, error: str = None):
+    """Google OAuth login page."""
+    return templates.TemplateResponse(
+        "login.html",
+        {
+            "request": request,
+            "error": error,
+        },
+    )
+
+
+@app.get("/auth/callback-init")
+async def auth_callback_init(request: Request):
+    """Initialize OAuth flow and redirect to Google."""
+    # Generate state token for CSRF protection
+    state = secrets.token_urlsafe(32)
+    request.session["oauth_state"] = state
+
+    # Get authorization URL
+    auth_service = get_auth_service()
+    redirect_uri = str(request.url_for("auth_callback"))
+
+    authorization_url = auth_service.get_authorization_url(
+        redirect_uri=redirect_uri,
+        state=state,
+    )
+
+    return RedirectResponse(url=authorization_url)
+
+
+@app.get("/auth/callback")
+async def auth_callback(request: Request):
+    """Handle OAuth callback from Google."""
+    try:
+        # Verify state token
+        state = request.query_params.get("state")
+        session_state = request.session.get("oauth_state")
+
+        if not state or state != session_state:
+            return RedirectResponse(
+                url="/auth/login?error=Invalid+state+token",
+                status_code=303,
+            )
+
+        # Exchange code for token and get user info
+        auth_service = get_auth_service()
+        redirect_uri = str(request.url_for("auth_callback"))
+
+        user_info = auth_service.fetch_token(
+            redirect_uri=redirect_uri,
+            authorization_response=str(request.url),
+        )
+
+        # Store user info in session
+        request.session["user"] = {
+            "email": user_info["email"],
+            "name": user_info["name"],
+            "picture": user_info.get("picture"),
+        }
+
+        # Clear OAuth state
+        request.session.pop("oauth_state", None)
+
+        logger.info(f"User logged in: {user_info['email']}")
+
+        # Redirect to home page
+        return RedirectResponse(url="/", status_code=303)
+
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        return RedirectResponse(
+            url=f"/auth/login?error={str(e)}",
+            status_code=303,
+        )
+
+
+@app.get("/auth/logout")
+async def auth_logout(request: Request):
+    """Logout user."""
+    user = request.session.get("user", {})
+    logger.info(f"User logged out: {user.get('email', 'unknown')}")
+
+    request.session.clear()
+    return RedirectResponse(url="/auth/login", status_code=303)
+
+
+# ============================================================================
 # Routes - Wizard Flow
 # ============================================================================
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    """Home page - Step 1: Email entry."""
+    """Home page - Step 1: Topic entry (email from OAuth)."""
     # Clear any previous session
     clear_session_data(request)
+
+    # Get authenticated user
+    user = request.session.get("user", {})
 
     # Get configuration status
     config_status = {
@@ -121,6 +221,7 @@ async def index(request: Request):
         "index.html",
         {
             "request": request,
+            "user": user,
             "config_status": config_status,
         },
     )
@@ -129,30 +230,32 @@ async def index(request: Request):
 @app.post("/start")
 async def start_wizard(
     request: Request,
-    email: str = Form(...),
     topic: str = Form(...),
 ):
-    """Start the wizard - validate email and topic, proceed to module selection."""
-    # Validate inputs
-    if not email or "@" not in email:
-        return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
-                "error": "Please enter a valid email address.",
-                "email": email,
-                "topic": topic,
-            },
-        )
+    """Start the wizard - validate topic, proceed to module selection."""
+    # Get authenticated user email
+    user = request.session.get("user", {})
+    email = user.get("email")
 
+    if not email:
+        return RedirectResponse(url="/auth/login", status_code=303)
+
+    # Validate topic
     if not topic or len(topic) < 2:
+        config_status = {
+            "google_sheets": get_sheets_service().is_available(),
+            "email": get_email_service().is_available(),
+            "serpapi": settings.serpapi_available,
+            "lightcast": settings.lightcast_available,
+        }
         return templates.TemplateResponse(
             "index.html",
             {
                 "request": request,
+                "user": user,
                 "error": "Please enter a topic (at least 2 characters).",
-                "email": email,
                 "topic": topic,
+                "config_status": config_status,
             },
         )
 
