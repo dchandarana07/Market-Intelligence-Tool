@@ -1,115 +1,81 @@
 {% extends "base.html" %}
 
-{% block title %}Running Analysis - Market Intelligence Tool{% endblock %}
+{% block title %}Running Analysis · Market Intelligence{% endblock %}
 
 {% block progress %}
-<div class="bg-white border-b">
-    <div class="max-w-4xl mx-auto px-4 py-3">
-        <div class="flex items-center justify-between text-sm">
-            <span class="wizard-step completed">1. Start</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step completed">2. Select Modules</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step completed">3. Configure</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step completed">4. Review</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step active">5. Run</span>
-        </div>
+<section class="progress-shell">
+    <div class="container">
+        <ol class="progress-rail">
+            <li class="progress-node completed"><span class="node-index">1</span><div><strong>Start</strong></div></li>
+            <li class="progress-node completed"><span class="node-index">2</span><div><strong>Modules</strong></div></li>
+            <li class="progress-node completed"><span class="node-index">3</span><div><strong>Configure</strong></div></li>
+            <li class="progress-node completed"><span class="node-index">4</span><div><strong>Review</strong></div></li>
+            <li class="progress-node active"><span class="node-index">5</span><div><strong>Run</strong></div></li>
+        </ol>
     </div>
-</div>
+</section>
 {% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <!-- Header -->
-    <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold text-gray-800">Running Analysis</h1>
-        <p class="text-gray-600 mt-1">{{ run_info.session.topic }}</p>
+<div class="page-header">
+    <span class="eyebrow">Live execution</span>
+    <h1>Running analysis</h1>
+    <p class="hero-lede">{{ run_info.session.topic }}</p>
+</div>
+
+<div class="panel fade-in">
+    <div id="overall-status" class="results-card">
+        <div class="loading-spinner" style="margin-bottom:18px;"></div>
+        <div id="status-text">Starting analysis...</div>
     </div>
 
-    <!-- Status card -->
-    <div class="bg-white rounded-lg shadow-lg p-8">
-        <!-- Overall status -->
-        <div id="overall-status" class="text-center mb-8">
-            <div class="loading-spinner mx-auto mb-4"></div>
-            <div id="status-text" class="text-lg font-medium text-gray-700">Starting analysis...</div>
-        </div>
-
-        <!-- Module progress -->
-        <div id="module-progress" class="space-y-4">
-            {% for module_name in run_info.session.selected_modules %}
-            <div id="module-{{ module_name }}" class="flex items-center p-4 bg-gray-50 rounded-lg">
-                <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center">
-                    <div id="icon-{{ module_name }}" class="w-6 h-6 border-2 border-gray-300 rounded-full"></div>
-                </div>
-                <div class="ml-4 flex-1">
-                    <div id="name-{{ module_name }}" class="font-medium text-gray-800">{{ module_name | title }}</div>
-                    <div id="message-{{ module_name }}" class="text-sm text-gray-500">Waiting...</div>
-                </div>
+    <div id="module-progress" class="status-list" style="margin-top:32px;">
+        {% for module_name in run_info.session.selected_modules %}
+        <div id="module-{{ module_name }}" class="status-row">
+            <div>
+                <div id="name-{{ module_name }}"><strong>{{ module_name | title }}</strong></div>
+                <div id="message-{{ module_name }}" class="input-hint">Waiting...</div>
             </div>
-            {% endfor %}
+            <div id="icon-{{ module_name }}" class="pill">Queued</div>
         </div>
+        {% endfor %}
+    </div>
 
-        <!-- Error display (hidden by default) -->
-        <div id="error-display" class="hidden mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div class="flex items-start">
-                <svg class="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    <div id="error-display" class="alert error hidden" style="margin-top:24px;">
+        <strong>Errors detected:</strong>
+        <ul id="error-list" style="margin:10px 0 0 18px; padding:0;"></ul>
+    </div>
+
+    <div id="results-section" class="hidden" style="margin-top:32px;">
+        <div class="results-card">
+            <div class="icon-ring">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
+                    <path d="M5 13l4 4L19 7"></path>
                 </svg>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-red-800">Errors occurred:</h3>
-                    <ul id="error-list" class="mt-1 text-sm text-red-700 list-disc list-inside"></ul>
-                </div>
             </div>
-        </div>
-
-        <!-- Results section (hidden until complete) -->
-        <div id="results-section" class="hidden mt-8 pt-6 border-t">
-            <div class="text-center">
-                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                </div>
-                <h2 class="text-xl font-bold text-gray-800 mb-2">Analysis Complete!</h2>
-                <p class="text-gray-600 mb-6">Your results are ready in Google Sheets.</p>
-
-                <a id="results-link" href="#" target="_blank"
-                   class="inline-flex items-center bg-asu-maroon text-white py-3 px-8 rounded-lg font-medium hover:bg-opacity-90 transition">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                    </svg>
-                    Open Results in Google Sheets
-                </a>
-
-                <p class="mt-4 text-sm text-gray-500">
-                    A link has also been sent to <strong>{{ run_info.session.email }}</strong>
-                </p>
-            </div>
-        </div>
-
-        <!-- Start new analysis button (after completion) -->
-        <div id="new-analysis" class="hidden mt-6 text-center">
-            <a href="/" class="text-asu-maroon hover:underline">
-                Start a new analysis
+            <h2>Analysis complete</h2>
+            <p class="input-hint">Your results are ready in Google Sheets.</p>
+            <a id="results-link" href="#" target="_blank" class="btn btn-primary" style="margin-top:20px;">
+                Open results
             </a>
+            <p class="input-hint" style="margin-top:16px;">A link has also been sent to {{ run_info.session.email }}.</p>
         </div>
+    </div>
+
+    <div id="new-analysis" class="hidden" style="margin-top:24px;text-align:center;">
+        <a href="/" class="link-soft">Start a new analysis</a>
     </div>
 </div>
 
 <script>
     const runId = "{{ run_id }}";
-    let pollInterval;
 
-    // Start execution when page loads
     document.addEventListener('DOMContentLoaded', function() {
         startExecution();
     });
 
     async function startExecution() {
         try {
-            // Trigger execution
             const response = await fetch(`/execute/${runId}`, { method: 'POST' });
             const result = await response.json();
 
@@ -118,9 +84,7 @@
                 return;
             }
 
-            // Update UI with results
             updateStatus(result);
-
         } catch (error) {
             console.error('Execution failed:', error);
             showError(['Failed to start analysis. Please try again.']);
@@ -128,30 +92,26 @@
     }
 
     function updateStatus(result) {
-        const statusText = document.getElementById('status-text');
         const overallStatus = document.getElementById('overall-status');
+        const statusText = document.getElementById('status-text');
         const resultsSection = document.getElementById('results-section');
         const newAnalysis = document.getElementById('new-analysis');
 
-        // Update module statuses
         if (result.modules) {
             for (const [moduleName, moduleInfo] of Object.entries(result.modules)) {
                 updateModuleStatus(moduleName, moduleInfo);
             }
         }
 
-        // Handle completion states
         if (result.status === 'completed' || result.status === 'partial') {
-            // Success
             overallStatus.innerHTML = `
-                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                <div class="icon-ring" style="margin-bottom:16px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
+                        <path d="M5 13l4 4L19 7"></path>
                     </svg>
                 </div>
+                <div class="hero-lede" style="font-size:1.2rem;">${result.status === 'completed' ? 'Analysis complete' : 'Complete with warnings'}</div>
             `;
-            statusText.textContent = result.status === 'completed' ? 'Analysis Complete!' : 'Analysis Complete (with some warnings)';
-            statusText.className = 'text-xl font-bold text-green-600';
 
             if (result.output_url) {
                 document.getElementById('results-link').href = result.output_url;
@@ -159,24 +119,23 @@
             }
 
             newAnalysis.classList.remove('hidden');
-
         } else if (result.status === 'failed') {
-            // Failure
             overallStatus.innerHTML = `
-                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                <div class="icon-ring" style="border-color:rgba(251,113,133,0.4);background:rgba(251,113,133,0.12);margin-bottom:16px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2">
+                        <path d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </div>
+                <div class="hero-lede" style="font-size:1.2rem;">Analysis failed</div>
             `;
-            statusText.textContent = 'Analysis Failed';
-            statusText.className = 'text-xl font-bold text-red-600';
 
             if (result.errors && result.errors.length > 0) {
                 showError(result.errors);
             }
 
             newAnalysis.classList.remove('hidden');
+        } else {
+            statusText.textContent = result.status || 'Running...';
         }
     }
 
@@ -188,27 +147,34 @@
 
         if (!moduleDiv) return;
 
-        nameDiv.textContent = moduleInfo.display_name || moduleName;
+        nameDiv.innerHTML = `<strong>${moduleInfo.display_name || moduleName}</strong>`;
         messageDiv.textContent = moduleInfo.message || moduleInfo.status;
 
-        // Update icon based on status
         switch (moduleInfo.status) {
             case 'running':
-                iconDiv.innerHTML = '<div class="loading-spinner" style="width: 20px; height: 20px;"></div>';
-                moduleDiv.className = 'flex items-center p-4 bg-blue-50 rounded-lg';
+                iconDiv.innerHTML = '<div class="loading-spinner" style="width:18px;height:18px;"></div>';
+                iconDiv.className = 'pill';
+                moduleDiv.className = 'status-row running';
                 break;
             case 'completed':
-                iconDiv.innerHTML = '<svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
-                moduleDiv.className = 'flex items-center p-4 bg-green-50 rounded-lg';
+                iconDiv.textContent = 'Complete';
+                iconDiv.className = 'pill success';
+                moduleDiv.className = 'status-row completed';
                 break;
             case 'partial':
-                iconDiv.innerHTML = '<svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
-                moduleDiv.className = 'flex items-center p-4 bg-yellow-50 rounded-lg';
+                iconDiv.textContent = 'Partial';
+                iconDiv.className = 'pill warning';
+                moduleDiv.className = 'status-row';
                 break;
             case 'failed':
-                iconDiv.innerHTML = '<svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-                moduleDiv.className = 'flex items-center p-4 bg-red-50 rounded-lg';
+                iconDiv.textContent = 'Failed';
+                iconDiv.className = 'pill danger';
+                moduleDiv.className = 'status-row failed';
                 break;
+            default:
+                iconDiv.textContent = 'Queued';
+                iconDiv.className = 'pill';
+                moduleDiv.className = 'status-row';
         }
     }
 

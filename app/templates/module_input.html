@@ -1,140 +1,144 @@
 {% extends "base.html" %}
 
-{% block title %}Configure {{ module.display_name }} - Market Intelligence Tool{% endblock %}
+{% block title %}Configure {{ module.display_name }} · Market Intelligence{% endblock %}
 
 {% block progress %}
-<div class="bg-white border-b">
-    <div class="max-w-4xl mx-auto px-4 py-3">
-        <div class="flex items-center justify-between text-sm">
-            <span class="wizard-step completed">1. Start</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step completed">2. Select Modules</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step active">3. Configure</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step text-gray-400">4. Review</span>
-            <span class="text-gray-300">→</span>
-            <span class="wizard-step text-gray-400">5. Run</span>
-        </div>
+<section class="progress-shell">
+    <div class="container">
+        <ol class="progress-rail">
+            <li class="progress-node completed">
+                <span class="node-index">1</span>
+                <div><strong>Start</strong></div>
+            </li>
+            <li class="progress-node completed">
+                <span class="node-index">2</span>
+                <div><strong>Modules</strong></div>
+            </li>
+            <li class="progress-node active">
+                <span class="node-index">3</span>
+                <div><strong>Configure</strong></div>
+            </li>
+            <li class="progress-node">
+                <span class="node-index">4</span>
+                <div><strong>Review</strong></div>
+            </li>
+            <li class="progress-node">
+                <span class="node-index">5</span>
+                <div><strong>Run</strong></div>
+            </li>
+        </ol>
     </div>
-</div>
+</section>
 {% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <!-- Header -->
-    <div class="mb-6">
-        <div class="flex items-center space-x-2 text-sm text-gray-500 mb-2">
-            {% for mod in session.selected_modules %}
-            <span class="{% if mod == module_name %}text-asu-maroon font-medium{% endif %}">{{ mod }}</span>
-            {% if not loop.last %}<span>→</span>{% endif %}
-            {% endfor %}
-        </div>
-        <h1 class="text-2xl font-bold text-gray-800">Configure {{ module.display_name }}</h1>
-        <p class="text-gray-600 mt-1">{{ module.description }}</p>
-    </div>
+<div class="page-header">
+    <span class="eyebrow">Module Configuration</span>
+    <h1>{{ module.display_name }}</h1>
+    <p class="hero-lede">{{ module.description }}</p>
+</div>
 
-    <form action="/module/{{ module_name }}" method="POST" class="bg-white rounded-lg shadow-lg p-6">
-        <!-- Basic Fields -->
-        <div class="space-y-5">
-            {% for field in basic_fields %}
-            <div>
-                <label for="{{ field.name }}" class="block text-sm font-medium text-gray-700 mb-2">
-                    {{ field.label }}
-                    {% if field.required %}<span class="text-red-500">*</span>{% endif %}
-                </label>
+<div class="chip-trail">
+    {% for mod in session.selected_modules %}
+    <span class="chip {% if mod == module_name %}active{% endif %}">{{ mod }}</span>
+    {% endfor %}
+</div>
 
-                {% if field.field_type == 'text' %}
-                <input
-                    type="text"
-                    id="{{ field.name }}"
-                    name="{{ field.name }}"
-                    value="{{ existing_inputs.get(field.name, topic if field.name in ['query', 'keywords'] else field.default or '') }}"
-                    {% if field.required %}required{% endif %}
-                    placeholder="{{ field.placeholder }}"
-                    class="w-full px-4 py-3 border {% if errors and field.name in errors %}border-red-500{% else %}border-gray-300{% endif %} rounded-lg focus:ring-2 focus:ring-asu-maroon focus:border-transparent"
-                >
+<form action="/module/{{ module_name }}" method="POST" class="form-card fade-in">
+    <div class="form-grid">
+        {% for field in basic_fields %}
+        <div class="form-field">
+            <label for="{{ field.name }}">
+                {{ field.label }}
+                {% if field.required %}<span style="color:var(--danger); margin-left:6px;">*</span>{% endif %}
+            </label>
 
-                {% elif field.field_type == 'number' %}
-                <input
-                    type="number"
-                    id="{{ field.name }}"
-                    name="{{ field.name }}"
-                    value="{{ existing_inputs.get(field.name, field.default or '') }}"
-                    {% if field.min_value is not none %}min="{{ field.min_value }}"{% endif %}
-                    {% if field.max_value is not none %}max="{{ field.max_value }}"{% endif %}
-                    class="w-full px-4 py-3 border {% if errors and field.name in errors %}border-red-500{% else %}border-gray-300{% endif %} rounded-lg focus:ring-2 focus:ring-asu-maroon focus:border-transparent"
-                >
+            {% if field.field_type == 'text' %}
+            <input
+                type="text"
+                id="{{ field.name }}"
+                name="{{ field.name }}"
+                value="{{ existing_inputs.get(field.name, topic if field.name in ['query', 'keywords'] else field.default or '') }}"
+                {% if field.required %}required{% endif %}
+                placeholder="{{ field.placeholder }}"
+                class="input-control {% if errors and field.name in errors %}error{% endif %}"
+            >
 
-                {% elif field.field_type == 'select' %}
-                <select
-                    id="{{ field.name }}"
-                    name="{{ field.name }}"
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-asu-maroon focus:border-transparent"
-                >
-                    {% for option in field.options %}
-                    <option value="{{ option.value }}" {% if existing_inputs.get(field.name, field.default) == option.value %}selected{% endif %}>
-                        {{ option.label }}
-                    </option>
-                    {% endfor %}
-                </select>
+            {% elif field.field_type == 'number' %}
+            <input
+                type="number"
+                id="{{ field.name }}"
+                name="{{ field.name }}"
+                value="{{ existing_inputs.get(field.name, field.default or '') }}"
+                {% if field.min_value is not none %}min="{{ field.min_value }}"{% endif %}
+                {% if field.max_value is not none %}max="{{ field.max_value }}"{% endif %}
+                class="input-control {% if errors and field.name in errors %}error{% endif %}"
+            >
 
-                {% elif field.field_type == 'multiselect' %}
-                <div class="space-y-2">
-                    {% for option in field.options %}
-                    <label class="flex items-center">
-                        <input
-                            type="checkbox"
-                            name="{{ field.name }}"
-                            value="{{ option.value }}"
-                            {% if option.value in existing_inputs.get(field.name, field.default or []) %}checked{% endif %}
-                            class="h-4 w-4 text-asu-maroon rounded focus:ring-asu-maroon"
-                        >
-                        <span class="ml-2 text-gray-700">{{ option.label }}</span>
-                    </label>
-                    {% endfor %}
-                </div>
+            {% elif field.field_type == 'select' %}
+            <select
+                id="{{ field.name }}"
+                name="{{ field.name }}"
+                class="input-control"
+            >
+                {% for option in field.options %}
+                <option value="{{ option.value }}" {% if existing_inputs.get(field.name, field.default) == option.value %}selected{% endif %}>
+                    {{ option.label }}
+                </option>
+                {% endfor %}
+            </select>
 
-                {% elif field.field_type == 'checkbox' %}
-                <label class="flex items-center">
+            {% elif field.field_type == 'multiselect' %}
+            <div class="panel-light" style="padding:14px;border-radius:var(--radius-md);">
+                {% for option in field.options %}
+                <label class="checkbox-field" style="margin-bottom:6px;">
                     <input
                         type="checkbox"
-                        id="{{ field.name }}"
                         name="{{ field.name }}"
-                        {% if existing_inputs.get(field.name, field.default) %}checked{% endif %}
-                        class="h-5 w-5 text-asu-maroon rounded focus:ring-asu-maroon"
+                        value="{{ option.value }}"
+                        {% if option.value in existing_inputs.get(field.name, field.default or []) %}checked{% endif %}
                     >
-                    <span class="ml-3 text-gray-700">Enable</span>
+                    <span>{{ option.label }}</span>
                 </label>
-                {% endif %}
-
-                {% if field.help_text %}
-                <p class="mt-1 text-sm text-gray-500">{{ field.help_text }}</p>
-                {% endif %}
-
-                {% if errors and field.name in errors %}
-                <p class="mt-1 text-sm text-red-500">{{ errors[field.name] }}</p>
-                {% endif %}
+                {% endfor %}
             </div>
-            {% endfor %}
+
+            {% elif field.field_type == 'checkbox' %}
+            <label class="checkbox-field">
+                <input
+                    type="checkbox"
+                    id="{{ field.name }}"
+                    name="{{ field.name }}"
+                    {% if existing_inputs.get(field.name, field.default) %}checked{% endif %}
+                >
+                <span>Enable</span>
+            </label>
+            {% endif %}
+
+            {% if field.help_text %}
+            <p class="input-hint">{{ field.help_text }}</p>
+            {% endif %}
+
+            {% if errors and field.name in errors %}
+            <p class="input-error">{{ errors[field.name] }}</p>
+            {% endif %}
         </div>
+        {% endfor %}
+    </div>
 
-        <!-- Advanced Fields (collapsible) -->
-        {% if advanced_fields %}
-        <div class="mt-6 border-t pt-6">
-            <button type="button" onclick="toggleAdvanced()" class="flex items-center text-gray-600 hover:text-gray-800">
-                <svg id="advanced-arrow" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-                <span class="ml-2 font-medium">Advanced Options</span>
-            </button>
-
-            <div id="advanced-panel" class="hidden mt-4 space-y-5 pl-4 border-l-2 border-gray-200">
+    {% if advanced_fields %}
+    <div class="advanced-stack">
+        <button type="button" class="advanced-toggle" onclick="toggleAdvanced()" id="advanced-toggle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 5l7 7-7 7"></path>
+            </svg>
+            Advanced controls
+        </button>
+        <div id="advanced-panel" class="advanced-panel hidden">
+            <div class="form-grid">
                 {% for field in advanced_fields %}
-                <div>
-                    <label for="{{ field.name }}" class="block text-sm font-medium text-gray-700 mb-2">
-                        {{ field.label }}
-                    </label>
+                <div class="form-field">
+                    <label for="{{ field.name }}">{{ field.label }}</label>
 
                     {% if field.field_type == 'text' %}
                     <input
@@ -143,7 +147,7 @@
                         name="{{ field.name }}"
                         value="{{ existing_inputs.get(field.name, field.default or '') }}"
                         placeholder="{{ field.placeholder }}"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-asu-maroon focus:border-transparent"
+                        class="input-control"
                     >
 
                     {% elif field.field_type == 'number' %}
@@ -154,14 +158,14 @@
                         value="{{ existing_inputs.get(field.name, field.default or '') }}"
                         {% if field.min_value is not none %}min="{{ field.min_value }}"{% endif %}
                         {% if field.max_value is not none %}max="{{ field.max_value }}"{% endif %}
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-asu-maroon focus:border-transparent"
+                        class="input-control"
                     >
 
                     {% elif field.field_type == 'select' %}
                     <select
                         id="{{ field.name }}"
                         name="{{ field.name }}"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-asu-maroon focus:border-transparent"
+                        class="input-control"
                     >
                         {% for option in field.options %}
                         <option value="{{ option.value }}" {% if existing_inputs.get(field.name, field.default) == option.value %}selected{% endif %}>
@@ -171,68 +175,50 @@
                     </select>
 
                     {% elif field.field_type == 'checkbox' %}
-                    <label class="flex items-center">
+                    <label class="checkbox-field">
                         <input
                             type="checkbox"
                             id="{{ field.name }}"
                             name="{{ field.name }}"
                             {% if existing_inputs.get(field.name, field.default) %}checked{% endif %}
-                            class="h-5 w-5 text-asu-maroon rounded focus:ring-asu-maroon"
                         >
-                        <span class="ml-3 text-gray-700">Enable</span>
+                        <span>Enable</span>
                     </label>
                     {% endif %}
 
                     {% if field.help_text %}
-                    <p class="mt-1 text-sm text-gray-500">{{ field.help_text }}</p>
+                    <p class="input-hint">{{ field.help_text }}</p>
                     {% endif %}
                 </div>
                 {% endfor %}
             </div>
         </div>
+    </div>
+    {% endif %}
+
+    <div class="actions" style="justify-content:space-between;">
+        {% if prev_module %}
+        <a href="/module/{{ prev_module }}" class="btn btn-ghost">Previous</a>
+        {% else %}
+        <a href="/select-modules" class="btn btn-ghost">Back</a>
         {% endif %}
 
-        <!-- Navigation -->
-        <div class="mt-8 flex justify-between items-center border-t pt-6">
-            {% if prev_module %}
-            <a href="/module/{{ prev_module }}" class="text-gray-600 hover:text-gray-800 flex items-center">
-                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
-                </svg>
-                Previous
-            </a>
+        <button type="submit" class="btn btn-primary">
+            {% if is_last %}
+            Review & Run
             {% else %}
-            <a href="/select-modules" class="text-gray-600 hover:text-gray-800 flex items-center">
-                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
-                </svg>
-                Back
-            </a>
+            Next Module
             {% endif %}
-
-            <button
-                type="submit"
-                class="bg-asu-maroon text-white py-2 px-6 rounded-lg font-medium hover:bg-opacity-90 transition flex items-center"
-            >
-                {% if is_last %}
-                Review & Run
-                {% else %}
-                Next Module
-                {% endif %}
-                <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                </svg>
-            </button>
-        </div>
-    </form>
-</div>
+        </button>
+    </div>
+</form>
 
 <script>
 function toggleAdvanced() {
     const panel = document.getElementById('advanced-panel');
-    const arrow = document.getElementById('advanced-arrow');
+    const toggle = document.getElementById('advanced-toggle');
     panel.classList.toggle('hidden');
-    arrow.classList.toggle('rotate-90');
+    toggle.classList.toggle('active');
 }
 </script>
 {% endblock %}

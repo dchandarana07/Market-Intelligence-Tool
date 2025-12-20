@@ -1,97 +1,60 @@
 {% extends "base.html" %}
 
-{% block title %}Results - Market Intelligence Tool{% endblock %}
+{% block title %}Results · Market Intelligence{% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <!-- Success message -->
-    <div class="text-center mb-8">
-        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-        </div>
-        <h1 class="text-2xl font-bold text-gray-800">Analysis Complete!</h1>
-        <p class="text-gray-600 mt-1">{{ run_info.session.topic }}</p>
+<div class="page-header">
+    <span class="eyebrow">Delivery ready</span>
+    <h1>Analysis complete</h1>
+    <p class="hero-lede">{{ run_info.session.topic }}</p>
+</div>
+
+<div class="panel results-card">
+    <div class="icon-ring">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
+            <path d="M5 13l4 4L19 7"></path>
+        </svg>
     </div>
-
-    <!-- Results card -->
-    <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">Your Results</h2>
-
-        {% if run_info.output_url %}
-        <div class="bg-gray-50 rounded-lg p-6 mb-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="font-medium text-gray-800">Google Spreadsheet</div>
-                    <div class="text-sm text-gray-500 mt-1">All data organized in tabs</div>
-                </div>
-                <a href="{{ run_info.output_url }}" target="_blank"
-                   class="bg-asu-maroon text-white py-2 px-6 rounded-lg font-medium hover:bg-opacity-90 transition flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
-                    </svg>
-                    Open Spreadsheet
-                </a>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if run_info.output_folder_url %}
-        <div class="text-sm text-gray-500">
-            <a href="{{ run_info.output_folder_url }}" target="_blank" class="text-asu-maroon hover:underline">
-                View all results in Google Drive folder
-            </a>
-        </div>
-        {% endif %}
-    </div>
-
-    <!-- Module summary -->
-    {% if run_info.result and run_info.result.progress %}
-    <div class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-lg font-semibold text-gray-800 mb-4">Run Summary</h2>
-
-        <div class="space-y-3">
-            {% for module_name, progress in run_info.result.progress.items() %}
-            <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div class="flex items-center">
-                    {% if progress.status.value == 'completed' %}
-                    <span class="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
-                    {% elif progress.status.value == 'partial' %}
-                    <span class="w-3 h-3 bg-yellow-500 rounded-full mr-3"></span>
-                    {% else %}
-                    <span class="w-3 h-3 bg-red-500 rounded-full mr-3"></span>
-                    {% endif %}
-                    <span class="font-medium text-gray-800">{{ progress.display_name }}</span>
-                </div>
-                <div class="text-sm text-gray-500">
-                    {% if progress.result %}
-                    {{ progress.result.total_rows }} rows
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
+    <h2>Outputs shipped</h2>
+    <p class="input-hint">All modules completed and synced to Google Workspace.</p>
+    {% if run_info.output_url %}
+    <a href="{{ run_info.output_url }}" target="_blank" class="btn btn-primary" style="margin-top:20px;">
+        Open spreadsheet
+    </a>
     {% endif %}
+    {% if run_info.output_folder_url %}
+    <p class="input-hint" style="margin-top:14px;">
+        <a href="{{ run_info.output_folder_url }}" target="_blank" class="link-soft">Open Drive folder</a>
+    </p>
+    {% endif %}
+</div>
 
-    <!-- Email notification -->
-    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
-        <div class="flex items-start">
-            <svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-            </svg>
-            <div class="ml-3 text-sm text-blue-700">
-                A link to these results has been sent to <strong>{{ run_info.session.email }}</strong>
+{% if run_info.result and run_info.result.progress %}
+<div class="panel" style="margin-top:32px;">
+    <h2 style="margin-top:0;">Module performance</h2>
+    <div class="result-list" style="margin-top:20px;">
+        {% for module_name, progress in run_info.result.progress.items() %}
+        <div class="result-item {% if progress.status.value == 'completed' %}completed{% elif progress.status.value == 'partial' %}partial{% else %}failed{% endif %}">
+            <div>
+                <strong>{{ progress.display_name }}</strong>
+                {% if progress.result and progress.result.total_rows %}
+                <div class="input-hint">{{ progress.result.total_rows }} rows generated</div>
+                {% endif %}
             </div>
+            <span class="pill {% if progress.status.value == 'completed' %}success{% elif progress.status.value == 'partial' %}warning{% else %}danger{% endif %}">
+                {{ progress.status.value | title }}
+            </span>
         </div>
+        {% endfor %}
     </div>
+</div>
+{% endif %}
 
-    <!-- Actions -->
-    <div class="flex justify-center space-x-4">
-        <a href="/" class="bg-asu-maroon text-white py-2 px-6 rounded-lg font-medium hover:bg-opacity-90 transition">
-            Start New Analysis
-        </a>
-    </div>
+<div class="callout" style="margin-top:32px;">
+    A link to these results has been emailed to <strong>{{ run_info.session.email }}</strong>. Files stay in sync even if you rerun this workflow later.
+</div>
+
+<div class="actions" style="justify-content:center;">
+    <a href="/" class="btn btn-primary">Launch another analysis</a>
 </div>
 {% endblock %}

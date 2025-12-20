@@ -66,6 +66,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Mount static files FIRST (before middleware)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# Setup templates
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
 # Add authentication middleware (must be added BEFORE SessionMiddleware)
 app.add_middleware(AuthMiddleware)
 
@@ -75,12 +81,6 @@ app.add_middleware(
     secret_key=settings.secret_key,
     max_age=3600,  # 1 hour session
 )
-
-# Mount static files
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-# Setup templates
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 # In-memory storage for active runs (in production, use Redis or database)
 active_runs: dict[str, dict] = {}
