@@ -2,6 +2,7 @@
 .env
 *.json
 !package.json
+!railway.json
 config/google-credentials.json
 config/oauth_token.pickle
 
