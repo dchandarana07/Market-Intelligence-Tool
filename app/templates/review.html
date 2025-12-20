@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Review & Run - Market Intelligence Tool{% endblock %}
+
+{% block progress %}
+<div class="bg-white border-b">
+    <div class="max-w-4xl mx-auto px-4 py-3">
+        <div class="flex items-center justify-between text-sm">
+            <span class="wizard-step completed">1. Start</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step completed">2. Select Modules</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step completed">3. Configure</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step active">4. Review</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step text-gray-400">5. Run</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">Review & Run</h1>
+        <p class="text-gray-600 mt-1">
+            Review your configuration before running the analysis.
+        </p>
+    </div>
+
+    <!-- Summary -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Run Summary</h2>
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <div class="text-sm text-gray-500">Topic</div>
+                <div class="text-lg font-medium text-gray-800">{{ session.topic }}</div>
+            </div>
+            <div>
+                <div class="text-sm text-gray-500">Results will be sent to</div>
+                <div class="text-lg font-medium text-gray-800">{{ session.email }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Module configurations -->
+    <div class="space-y-4 mb-8">
+        {% for module_info in modules_info %}
+        <div class="bg-white rounded-lg shadow p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-medium text-gray-800">{{ module_info.display_name }}</h3>
+                <a href="/module/{{ module_info.name }}" class="text-sm text-asu-maroon hover:underline">
+                    Edit
+                </a>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                {% for key, value in module_info.inputs.items() %}
+                {% if value %}
+                <div>
+                    <span class="text-gray-500">{{ key.replace('_', ' ').title() }}:</span>
+                    <span class="text-gray-800 ml-1">
+                        {% if value is iterable and value is not string %}
+                            {{ value | join(', ') }}
+                        {% elif value == True %}
+                            Yes
+                        {% elif value == False %}
+                            No
+                        {% else %}
+                            {{ value }}
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Sharing options -->
+    <form action="/run" method="POST" class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Sharing Options</h2>
+
+        <div class="space-y-3">
+            <label class="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                    type="radio"
+                    name="sharing_mode"
+                    value="restricted"
+                    checked
+                    class="mt-1 h-4 w-4 text-asu-maroon focus:ring-asu-maroon"
+                >
+                <div class="ml-3">
+                    <div class="font-medium text-gray-800">Restricted (Recommended)</div>
+                    <div class="text-sm text-gray-500">Only {{ session.email }} can access the results</div>
+                </div>
+            </label>
+
+            <label class="flex items-start p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                    type="radio"
+                    name="sharing_mode"
+                    value="anyone"
+                    class="mt-1 h-4 w-4 text-asu-maroon focus:ring-asu-maroon"
+                >
+                <div class="ml-3">
+                    <div class="font-medium text-gray-800">Anyone with the link</div>
+                    <div class="text-sm text-yellow-600">Anyone with the link can view (less secure)</div>
+                </div>
+            </label>
+        </div>
+
+        <!-- Run button -->
+        <div class="mt-8 flex justify-between items-center border-t pt-6">
+            <a href="/module/{{ modules_info[-1].name }}" class="text-gray-600 hover:text-gray-800 flex items-center">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+                </svg>
+                Back
+            </a>
+
+            <button
+                type="submit"
+                class="bg-asu-maroon text-white py-3 px-8 rounded-lg font-medium hover:bg-opacity-90 transition flex items-center"
+            >
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Run Analysis
+            </button>
+        </div>
+    </form>
+
+    <!-- Time estimate note -->
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex items-start">
+            <svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div class="ml-3 text-sm text-blue-700">
+                <p><strong>Estimated time:</strong> 2-5 minutes depending on selected modules and data volume.</p>
+                <p class="mt-1">You can leave this page - results will be emailed to {{ session.email }}.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

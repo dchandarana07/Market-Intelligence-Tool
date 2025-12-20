@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Select Modules - Market Intelligence Tool{% endblock %}
+
+{% block progress %}
+<div class="bg-white border-b">
+    <div class="max-w-4xl mx-auto px-4 py-3">
+        <div class="flex items-center justify-between text-sm">
+            <span class="wizard-step completed">1. Start</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step active">2. Select Modules</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step text-gray-400">3. Configure</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step text-gray-400">4. Review</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step text-gray-400">5. Run</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">Select Modules</h1>
+        <p class="text-gray-600 mt-1">
+            Choose which data sources to include for <strong>{{ session.topic }}</strong>
+        </p>
+    </div>
+
+    {% if error %}
+    <div class="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <form action="/select-modules" method="POST">
+        <div class="space-y-4">
+            {% for module in modules %}
+            <label class="block bg-white rounded-lg shadow p-5 cursor-pointer hover:shadow-md transition border-2 {% if not module.available %}border-gray-200 opacity-60{% else %}border-transparent hover:border-asu-maroon{% endif %}">
+                <div class="flex items-start">
+                    <input
+                        type="checkbox"
+                        name="modules"
+                        value="{{ module.name }}"
+                        {% if not module.available %}disabled{% endif %}
+                        {% if module.name in ['jobs', 'courses'] %}checked{% endif %}
+                        class="mt-1 h-5 w-5 text-asu-maroon rounded focus:ring-asu-maroon"
+                    >
+                    <div class="ml-4 flex-1">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-gray-800">{{ module.display_name }}</span>
+                            {% if not module.available %}
+                            <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Not Configured</span>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">{{ module.description }}</p>
+                        {% if module.availability_message %}
+                        <p class="text-xs text-yellow-600 mt-2">{{ module.availability_message }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+
+        <!-- Module dependencies note -->
+        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex items-start">
+                <svg class="w-5 h-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="ml-3 text-sm text-blue-700">
+                    <p><strong>Tip:</strong> If you select "Job Postings", the extracted skills can automatically feed into "Skills Trends" and "Skills Normalization" modules.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="mt-8 flex justify-between">
+            <a href="/" class="text-gray-600 hover:text-gray-800 flex items-center">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 17l-5-5m0 0l5-5m-5 5h12"></path>
+                </svg>
+                Back
+            </a>
+            <button
+                type="submit"
+                class="bg-asu-maroon text-white py-2 px-6 rounded-lg font-medium hover:bg-opacity-90 transition flex items-center"
+            >
+                Continue
+                <svg class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

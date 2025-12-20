@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Running Analysis - Market Intelligence Tool{% endblock %}
+
+{% block progress %}
+<div class="bg-white border-b">
+    <div class="max-w-4xl mx-auto px-4 py-3">
+        <div class="flex items-center justify-between text-sm">
+            <span class="wizard-step completed">1. Start</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step completed">2. Select Modules</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step completed">3. Configure</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step completed">4. Review</span>
+            <span class="text-gray-300">→</span>
+            <span class="wizard-step active">5. Run</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Header -->
+    <div class="text-center mb-8">
+        <h1 class="text-2xl font-bold text-gray-800">Running Analysis</h1>
+        <p class="text-gray-600 mt-1">{{ run_info.session.topic }}</p>
+    </div>
+
+    <!-- Status card -->
+    <div class="bg-white rounded-lg shadow-lg p-8">
+        <!-- Overall status -->
+        <div id="overall-status" class="text-center mb-8">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <div id="status-text" class="text-lg font-medium text-gray-700">Starting analysis...</div>
+        </div>
+
+        <!-- Module progress -->
+        <div id="module-progress" class="space-y-4">
+            {% for module_name in run_info.session.selected_modules %}
+            <div id="module-{{ module_name }}" class="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+                    <div id="icon-{{ module_name }}" class="w-6 h-6 border-2 border-gray-300 rounded-full"></div>
+                </div>
+                <div class="ml-4 flex-1">
+                    <div id="name-{{ module_name }}" class="font-medium text-gray-800">{{ module_name | title }}</div>
+                    <div id="message-{{ module_name }}" class="text-sm text-gray-500">Waiting...</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Error display (hidden by default) -->
+        <div id="error-display" class="hidden mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div class="flex items-start">
+                <svg class="w-5 h-5 text-red-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">Errors occurred:</h3>
+                    <ul id="error-list" class="mt-1 text-sm text-red-700 list-disc list-inside"></ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results section (hidden until complete) -->
+        <div id="results-section" class="hidden mt-8 pt-6 border-t">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-800 mb-2">Analysis Complete!</h2>
+                <p class="text-gray-600 mb-6">Your results are ready in Google Sheets.</p>
+
+                <a id="results-link" href="#" target="_blank"
+                   class="inline-flex items-center bg-asu-maroon text-white py-3 px-8 rounded-lg font-medium hover:bg-opacity-90 transition">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                    Open Results in Google Sheets
+                </a>
+
+                <p class="mt-4 text-sm text-gray-500">
+                    A link has also been sent to <strong>{{ run_info.session.email }}</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- Start new analysis button (after completion) -->
+        <div id="new-analysis" class="hidden mt-6 text-center">
+            <a href="/" class="text-asu-maroon hover:underline">
+                Start a new analysis
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const runId = "{{ run_id }}";
+    let pollInterval;
+
+    // Start execution when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        startExecution();
+    });
+
+    async function startExecution() {
+        try {
+            // Trigger execution
+            const response = await fetch(`/execute/${runId}`, { method: 'POST' });
+            const result = await response.json();
+
+            if (result.error) {
+                showError([result.error]);
+                return;
+            }
+
+            // Update UI with results
+            updateStatus(result);
+
+        } catch (error) {
+            console.error('Execution failed:', error);
+            showError(['Failed to start analysis. Please try again.']);
+        }
+    }
+
+    function updateStatus(result) {
+        const statusText = document.getElementById('status-text');
+        const overallStatus = document.getElementById('overall-status');
+        const resultsSection = document.getElementById('results-section');
+        const newAnalysis = document.getElementById('new-analysis');
+
+        // Update module statuses
+        if (result.modules) {
+            for (const [moduleName, moduleInfo] of Object.entries(result.modules)) {
+                updateModuleStatus(moduleName, moduleInfo);
+            }
+        }
+
+        // Handle completion states
+        if (result.status === 'completed' || result.status === 'partial') {
+            // Success
+            overallStatus.innerHTML = `
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+            `;
+            statusText.textContent = result.status === 'completed' ? 'Analysis Complete!' : 'Analysis Complete (with some warnings)';
+            statusText.className = 'text-xl font-bold text-green-600';
+
+            if (result.output_url) {
+                document.getElementById('results-link').href = result.output_url;
+                resultsSection.classList.remove('hidden');
+            }
+
+            newAnalysis.classList.remove('hidden');
+
+        } else if (result.status === 'failed') {
+            // Failure
+            overallStatus.innerHTML = `
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </div>
+            `;
+            statusText.textContent = 'Analysis Failed';
+            statusText.className = 'text-xl font-bold text-red-600';
+
+            if (result.errors && result.errors.length > 0) {
+                showError(result.errors);
+            }
+
+            newAnalysis.classList.remove('hidden');
+        }
+    }
+
+    function updateModuleStatus(moduleName, moduleInfo) {
+        const moduleDiv = document.getElementById(`module-${moduleName}`);
+        const iconDiv = document.getElementById(`icon-${moduleName}`);
+        const nameDiv = document.getElementById(`name-${moduleName}`);
+        const messageDiv = document.getElementById(`message-${moduleName}`);
+
+        if (!moduleDiv) return;
+
+        nameDiv.textContent = moduleInfo.display_name || moduleName;
+        messageDiv.textContent = moduleInfo.message || moduleInfo.status;
+
+        // Update icon based on status
+        switch (moduleInfo.status) {
+            case 'running':
+                iconDiv.innerHTML = '<div class="loading-spinner" style="width: 20px; height: 20px;"></div>';
+                moduleDiv.className = 'flex items-center p-4 bg-blue-50 rounded-lg';
+                break;
+            case 'completed':
+                iconDiv.innerHTML = '<svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                moduleDiv.className = 'flex items-center p-4 bg-green-50 rounded-lg';
+                break;
+            case 'partial':
+                iconDiv.innerHTML = '<svg class="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+                moduleDiv.className = 'flex items-center p-4 bg-yellow-50 rounded-lg';
+                break;
+            case 'failed':
+                iconDiv.innerHTML = '<svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                moduleDiv.className = 'flex items-center p-4 bg-red-50 rounded-lg';
+                break;
+        }
+    }
+
+    function showError(errors) {
+        const errorDisplay = document.getElementById('error-display');
+        const errorList = document.getElementById('error-list');
+
+        errorList.innerHTML = errors.map(e => `<li>${e}</li>`).join('');
+        errorDisplay.classList.remove('hidden');
+    }
+</script>
+{% endblock %}
