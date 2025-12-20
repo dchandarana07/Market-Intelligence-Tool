@@ -66,15 +66,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Add authentication middleware (must be added BEFORE SessionMiddleware)
+app.add_middleware(AuthMiddleware)
+
 # Add session middleware
 app.add_middleware(
     SessionMiddleware,
     secret_key=settings.secret_key,
     max_age=3600,  # 1 hour session
 )
-
-# Add authentication middleware
-app.add_middleware(AuthMiddleware)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

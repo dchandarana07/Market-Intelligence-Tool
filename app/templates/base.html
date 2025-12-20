@@ -3,98 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Market Intelligence Tool{% endblock %}</title>
-
-    <!-- Tailwind CSS via CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'asu-maroon': '#8C1D40',
-                        'asu-gold': '#FFC627',
-                        'asu-dark': '#191919',
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Custom styles -->
-    <style>
-        .wizard-step {
-            transition: all 0.3s ease;
-        }
-        .wizard-step.active {
-            color: #8C1D40;
-            font-weight: 600;
-        }
-        .wizard-step.completed {
-            color: #28a745;
-        }
-        .wizard-step.completed::after {
-            content: '✓';
-            margin-left: 4px;
-        }
-        .loading-spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #8C1D40;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .fade-in {
-            animation: fadeIn 0.3s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-
-    {% block head %}{% endblock %}
+    <title>{% block title %}Market Intelligence{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/custom.css">
+    {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <!-- Header -->
-    <header class="bg-asu-maroon text-white shadow-lg">
-        <div class="max-w-6xl mx-auto px-4 py-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <a href="/" class="flex items-center space-x-2">
-                        <svg class="w-8 h-8 text-asu-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-content">
+                <a href="/" class="navbar-brand">Market Intelligence</a>
+
+                {% if user %}
+                <div class="navbar-user">
+                    <div class="user-info" style="text-align: right; margin-right: 0.75rem;">
+                        <span class="user-name">{{ user.name }}</span>
+                        <span class="user-email">{{ user.email }}</span>
+                    </div>
+                    {% if user.picture %}
+                    <img src="{{ user.picture }}" alt="{{ user.name }}" class="user-avatar">
+                    {% else %}
+                    <div class="user-avatar" style="background: linear-gradient(135deg, #0071e3, #0077ed); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">
+                        {{ user.name[0] if user.name else 'U' }}
+                    </div>
+                    {% endif %}
+                    <a href="/auth/logout" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
                         </svg>
-                        <span class="text-xl font-bold">Market Intelligence</span>
                     </a>
                 </div>
-                <div class="text-sm text-gray-200">
-                    ASU Learning Enterprise
-                </div>
+                {% endif %}
             </div>
         </div>
-    </header>
+    </nav>
 
-    <!-- Progress indicator (if in wizard flow) -->
-    {% block progress %}{% endblock %}
-
-    <!-- Main content -->
-    <main class="max-w-4xl mx-auto px-4 py-8">
-        {% block content %}{% endblock %}
+    <!-- Main Content -->
+    <main style="min-height: calc(100vh - 80px); padding: 2rem 0;">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gray-100 border-t mt-auto">
-        <div class="max-w-6xl mx-auto px-4 py-6 text-center text-gray-500 text-sm">
-            <p>Market Intelligence Tool v1.0 | ASU Learning Enterprise</p>
+    <footer style="border-top: 1px solid var(--color-border); padding: 2rem 0; margin-top: 4rem;">
+        <div class="container">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">
+                    © 2025 Market Intelligence Tool. Enterprise-grade market research platform.
+                </p>
+                <div style="display: flex; gap: 1.5rem;">
+                    <a href="#" style="font-size: 0.875rem; color: var(--color-text-secondary);">Documentation</a>
+                    <a href="#" style="font-size: 0.875rem; color: var(--color-text-secondary);">Support</a>
+                    <a href="#" style="font-size: 0.875rem; color: var(--color-text-secondary);">Privacy</a>
+                </div>
+            </div>
         </div>
     </footer>
 
-    {% block scripts %}{% endblock %}
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

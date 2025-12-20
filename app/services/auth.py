@@ -6,6 +6,7 @@ Handles user authentication via Google Sign-In.
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 from google_auth_oauthlib.flow import Flow
@@ -13,6 +14,11 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
 from config.settings import settings
+
+# Allow HTTP for local development (OAuth requires HTTPS by default)
+# ONLY enable this for development - production should use HTTPS
+if settings.environment == "development":
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 logger = logging.getLogger(__name__)
 
