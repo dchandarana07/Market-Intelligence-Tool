@@ -1,67 +1,108 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Market Intelligence{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/custom.css">
+    <script>
+        (function() {
+            const storageKey = 'mi-theme';
+            let saved = null;
+            try {
+                saved = localStorage.getItem(storageKey);
+            } catch (err) {
+                saved = null;
+            }
+            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = saved || (prefersDark ? 'dark' : 'light');
+            document.documentElement.dataset.theme = theme;
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/custom.css?v=5">
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <!-- Navigation Bar -->
-    <nav class="navbar">
-        <div class="container">
-            <div class="navbar-content">
-                <a href="/" class="navbar-brand">Market Intelligence</a>
+<body class="app-shell">
+    <div class="background-grid"></div>
+
+    <header class="app-nav">
+        <div class="container nav-inner">
+            <a href="/" class="brand-block">
+                <div class="brand-logo">LI</div>
+                <div class="brand-text-stack">
+                    <span class="brand-line-1">Learning Innovations</span>
+                    <span class="brand-line-2">Market Research Console</span>
+                </div>
+            </a>
+
+            <div class="nav-user">
+                <button type="button" id="themeToggle" class="btn btn-ghost mode-btn" aria-label="Switch to light mode">
+                    Light Mode
+                </button>
 
                 {% if user %}
-                <div class="navbar-user">
-                    <div class="user-info" style="text-align: right; margin-right: 0.75rem;">
-                        <span class="user-name">{{ user.name }}</span>
-                        <span class="user-email">{{ user.email }}</span>
-                    </div>
+                <div class="user-pill">
                     {% if user.picture %}
-                    <img src="{{ user.picture }}" alt="{{ user.name }}" class="user-avatar">
+                    <img src="{{ user.picture }}" alt="{{ user.name }}" class="avatar">
                     {% else %}
-                    <div class="user-avatar" style="background: linear-gradient(135deg, #0071e3, #0077ed); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600;">
-                        {{ user.name[0] if user.name else 'U' }}
-                    </div>
+                    <div class="avatar">{{ user.name[0] if user and user.name else 'U' }}</div>
                     {% endif %}
-                    <a href="/auth/logout" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                    </a>
+                    <div class="user-meta">
+                        <strong>{{ user.name }}</strong>
+                        <span>{{ user.email }}</span>
+                    </div>
                 </div>
+                <a href="/auth/logout" class="btn btn-ghost">Sign Out</a>
+                {% else %}
+                <div class="pill">Secure Workspace</div>
                 {% endif %}
             </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- Main Content -->
-    <main style="min-height: calc(100vh - 80px); padding: 2rem 0;">
-        <div class="container">
+    {% block progress %}{% endblock %}
+
+    <main class="app-main">
+        <div class="container content-wrap">
             {% block content %}{% endblock %}
         </div>
     </main>
 
-    <!-- Footer -->
-    <footer style="border-top: 1px solid var(--color-border); padding: 2rem 0; margin-top: 4rem;">
-        <div class="container">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">
-                    © 2025 Market Intelligence Tool. Enterprise-grade market research platform.
-                </p>
-                <div style="display: flex; gap: 1.5rem;">
-                    <a href="#" style="font-size: 0.875rem; color: var(--color-text-secondary);">Documentation</a>
-                    <a href="#" style="font-size: 0.875rem; color: var(--color-text-secondary);">Support</a>
-                    <a href="#" style="font-size: 0.875rem; color: var(--color-text-secondary);">Privacy</a>
-                </div>
-            </div>
+    <footer>
+        <div class="container footer-inner" style="justify-content: center; text-align: center;">
+            <div>© 2025 Market Intelligence · Learning Enterprise · Arizona State University</div>
         </div>
     </footer>
+
+    <script>
+        (function() {
+            const root = document.documentElement;
+            const toggle = document.getElementById('themeToggle');
+            if (!toggle) return;
+            const storageKey = 'mi-theme';
+
+            const storeTheme = (theme) => {
+                try {
+                    localStorage.setItem(storageKey, theme);
+                } catch (err) {}
+            };
+
+            const updateButton = () => {
+                const current = root.dataset.theme || 'dark';
+                const label = current === 'dark' ? 'Light Mode' : 'Dark Mode';
+                toggle.textContent = label;
+                toggle.setAttribute('aria-label', `Switch to ${label.toLowerCase()}`);
+            };
+
+            updateButton();
+
+            toggle.addEventListener('click', () => {
+                const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+                root.dataset.theme = next;
+                storeTheme(next);
+                updateButton();
+            });
+        })();
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>

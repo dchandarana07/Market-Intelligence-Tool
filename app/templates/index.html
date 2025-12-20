@@ -1,170 +1,60 @@
 {% extends "base.html" %}
 
-{% block title %}Get Started - Market Intelligence{% endblock %}
+{% block title %}Market Intelligence{% endblock %}
 
 {% block content %}
-<div class="fade-in">
-    <!-- Hero Section -->
-    <div class="hero">
-        <h1 class="hero-title">Market Intelligence</h1>
-        <p class="hero-description">
-            Comprehensive market research powered by real-time data.<br>
-            Analyze job markets, skills demand, and educational trends.
-        </p>
-    </div>
+<section class="hero-block">
+    <span class="eyebrow">Market Intelligence Insights</span>
+    <h1 class="hero-title">Precision market intelligence that feels handcrafted.</h1>
+    <p class="hero-lede">Blend labor data, education supply, and demand signals into a single storyline. Everything downstream stays untouched—we simply elevate the experience.</p>
+</section>
 
-    <!-- System Status Card (Collapsible) -->
-    <div class="card" style="margin-bottom: 2.5rem; padding: 1.5rem;">
-        <button onclick="toggleStatus()" style="width: 100%; display: flex; align-items: center; justify-content: space-between; background: none; border: none; cursor: pointer; padding: 0;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--color-success);"></div>
-                <span style="font-weight: 600; color: var(--color-text-primary);">All Systems Operational</span>
-            </div>
-            <svg id="status-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
-                <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-        </button>
-
-        <div id="status-panel" style="display: none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border);">
-            <div class="grid grid-4">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    {% if config_status.google_sheets %}
-                    <span class="status-dot status-success"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">Google Sheets</span>
-                    {% else %}
-                    <span class="status-dot status-error"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">Google Sheets</span>
-                    {% endif %}
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    {% if config_status.serpapi %}
-                    <span class="status-dot status-success"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">SerpAPI</span>
-                    {% else %}
-                    <span class="status-dot status-warning"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">SerpAPI</span>
-                    {% endif %}
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    {% if config_status.lightcast %}
-                    <span class="status-dot status-success"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">Lightcast</span>
-                    {% else %}
-                    <span class="status-dot status-warning"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">Lightcast</span>
-                    {% endif %}
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    {% if config_status.email %}
-                    <span class="status-dot status-success"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">Email</span>
-                    {% else %}
-                    <span class="status-dot status-warning"></span>
-                    <span style="font-size: 0.875rem; color: var(--color-text-secondary);">Email</span>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {% if error %}
-    <div class="alert-error" style="margin-bottom: 2.5rem;">
-        {{ error }}
-    </div>
-    {% endif %}
-
-    <!-- Main Form Card -->
-    <div class="card" style="max-width: 640px; margin: 0 auto 3rem;">
-        <div class="card-header">
-            <h2 class="card-title" style="margin-bottom: 0.5rem;">Start Your Research</h2>
-            <p class="card-description">Enter a topic to analyze job markets, courses, and skills demand.</p>
-        </div>
+<div class="max-720">
+    <div class="panel form-card">
+        {% if error %}
+        <div class="alert error" role="alert">{{ error }}</div>
+        {% endif %}
 
         <form action="/start" method="POST">
-            <div class="form-group" style="margin-bottom: 2rem;">
-                <label for="topic" class="form-label">Research Topic</label>
-                <input
-                    type="text"
-                    id="topic"
-                    name="topic"
-                    value="{{ topic or '' }}"
-                    required
-                    placeholder="e.g., Artificial Intelligence, Cybersecurity, Data Science"
-                    class="form-input"
-                    style="font-size: 1.125rem; padding: 1rem 1.25rem;"
-                    autofocus
-                >
-                <p class="form-help">This will be used as the primary search term across all data sources.</p>
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="topic">Research Topic</label>
+                    <input
+                        type="text"
+                        id="topic"
+                        name="topic"
+                        class="input-control"
+                        value="{{ topic or '' }}"
+                        required
+                        placeholder="Ex: Applied AI talent demand"
+                        autofocus
+                    >
+                    <p class="input-hint">We orchestrate the jobs, training, skills, and signals around this theme.</p>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    Launch Intelligence Workflow
+                </button>
             </div>
-
-            <button type="submit" class="btn btn-primary btn-block btn-large">
-                <span>Continue</span>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
-            </button>
         </form>
-    </div>
-
-    <!-- Features Grid -->
-    <div class="grid grid-4" style="max-width: 1000px; margin: 0 auto;">
-        <div class="card" style="text-align: center; padding: 2rem 1.5rem;">
-            <div class="module-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin: 0 auto 1rem;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                </svg>
-            </div>
-            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Job Market Data</h3>
-            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">Real-time postings & labor statistics</p>
-        </div>
-
-        <div class="card" style="text-align: center; padding: 2rem 1.5rem;">
-            <div class="module-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; margin: 0 auto 1rem;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-                </svg>
-            </div>
-            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Course Catalog</h3>
-            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">Top courses from leading platforms</p>
-        </div>
-
-        <div class="card" style="text-align: center; padding: 2rem 1.5rem;">
-            <div class="module-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; margin: 0 auto 1rem;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                </svg>
-            </div>
-            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Trend Analysis</h3>
-            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">Search interest & demand patterns</p>
-        </div>
-
-        <div class="card" style="text-align: center; padding: 2rem 1.5rem;">
-            <div class="module-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; margin: 0 auto 1rem;">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-            </div>
-            <h3 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem;">Skills Mapping</h3>
-            <p style="font-size: 0.875rem; color: var(--color-text-secondary); margin: 0;">Normalized skill taxonomy</p>
-        </div>
     </div>
 </div>
 
-<script>
-function toggleStatus() {
-    const panel = document.getElementById('status-panel');
-    const arrow = document.getElementById('status-arrow');
-    if (panel.style.display === 'none') {
-        panel.style.display = 'block';
-        arrow.style.transform = 'rotate(180deg)';
-    } else {
-        panel.style.display = 'none';
-        arrow.style.transform = 'rotate(0deg)';
-    }
-}
-</script>
+<div class="feature-grid">
+    <div class="feature-tile">
+        <h3>Job Market Analysis</h3>
+        <p>Fresh postings and labor benchmarks across enterprise geos.</p>
+    </div>
+    <div class="feature-tile">
+        <h3>Course Discovery</h3>
+        <p>Mapped supply from top platforms with deduped metadata.</p>
+    </div>
+    <div class="feature-tile">
+        <h3>Trend Radar</h3>
+        <p>Search and hiring signals layered over time horizons.</p>
+    </div>
+    <div class="feature-tile">
+        <h3>Skills Intelligence</h3>
+        <p>Normalization, clustering, and taxonomy-ready outputs.</p>
+    </div>
+</div>
 {% endblock %}
