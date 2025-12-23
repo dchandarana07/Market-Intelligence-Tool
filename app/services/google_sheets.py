@@ -61,36 +61,61 @@ class GoogleSheetsService:
     def _get_client(self) -> gspread.Client:
         """Get or create the gspread client with credentials."""
         if self._client is None:
-            if not self._credentials_path.exists():
-                raise FileNotFoundError(
-                    f"Google credentials file not found at: {self._credentials_path}\n"
-                    "Please follow the setup instructions to create a service account "
-                    "and download the credentials JSON file."
-                )
-
-            credentials = Credentials.from_service_account_file(
-                str(self._credentials_path),
-                scopes=SCOPES,
-            )
+            credentials = self._get_credentials()
             self._client = gspread.authorize(credentials)
             self._initialized = True
             logger.info("Google Sheets client initialized successfully")
 
         return self._client
 
+    def _get_credentials(self) -> Credentials:
+        """Get credentials from file or environment variable."""
+        import json
+
+        # Try environment variable first
+        if settings.google_credentials_json:
+            logger.info("Loading Google credentials from environment variable")
+            credentials_info = json.loads(settings.google_credentials_json)
+            return Credentials.from_service_account_info(credentials_info, scopes=SCOPES)
+
+        # Fall back to file
+        if self._credentials_path.exists():
+            logger.info(f"Loading Google credentials from file: {self._credentials_path}")
+            return Credentials.from_service_account_file(
+                str(self._credentials_path),
+                scopes=SCOPES,
+            )
+
+        raise FileNotFoundError(
+            "Google credentials not found. Either:\n"
+            f"1. Set GOOGLE_CREDENTIALS_JSON environment variable, or\n"
+            f"2. Place credentials file at: {self._credentials_path}"
+        )
+
     def is_available(self) -> bool:
         """Check if the service is available (credentials exist)."""
-        return self._credentials_path.exists() and settings.google_drive_folder_id != ""
+        has_credentials = (
+            settings.google_credentials_json != "" or
+            self._credentials_path.exists()
+        )
+        return has_credentials and settings.google_drive_folder_id != ""
 
     def get_service_account_email(self) -> Optional[str]:
         """Get the service account email for sharing folders."""
-        if not self._credentials_path.exists():
-            return None
-
         import json
-        with open(self._credentials_path) as f:
-            data = json.load(f)
+
+        # Try environment variable first
+        if settings.google_credentials_json:
+            data = json.loads(settings.google_credentials_json)
             return data.get("client_email")
+
+        # Fall back to file
+        if self._credentials_path.exists():
+            with open(self._credentials_path) as f:
+                data = json.load(f)
+                return data.get("client_email")
+
+        return None
 
     @retry(
         stop=stop_after_attempt(3),
@@ -130,10 +155,7 @@ class GoogleSheetsService:
         logger.info(f"Creating spreadsheet: {full_title}")
 
         # Get credentials for direct API access
-        credentials = Credentials.from_service_account_file(
-            str(self._credentials_path),
-            scopes=SCOPES,
-        )
+        credentials = self._get_credentials()
 
         # Use Drive API to create file directly in the target folder
         drive_service = build("drive", "v3", credentials=credentials)
@@ -249,12 +271,8 @@ class GoogleSheetsService:
         # Get the Drive service through gspread's client
         # We need to use the underlying Google API for moving files
         from googleapiclient.discovery import build
-        from google.oauth2.service_account import Credentials
 
-        credentials = Credentials.from_service_account_file(
-            str(self._credentials_path),
-            scopes=SCOPES,
-        )
+        credentials = self._get_credentials()
         drive_service = build("drive", "v3", credentials=credentials)
 
         # Get current parents

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Google Cloud / Drive / Sheets
     # -----------------
     google_credentials_path: Path = Path("./config/google-credentials.json")
+    google_credentials_json: str = ""  # Alternative to file: full JSON as string
     google_drive_folder_id: str = ""
 
     # Google OAuth for Sign-In
@@ -73,7 +74,11 @@ class Settings(BaseSettings):
 
     @property
     def google_credentials_available(self) -> bool:
-        return self.google_credentials_path.exists() and self.google_drive_folder_id != ""
+        has_credentials = (
+            self.google_credentials_json != "" or
+            self.google_credentials_path.exists()
+        )
+        return has_credentials and self.google_drive_folder_id != ""
 
     @property
     def serpapi_available(self) -> bool:
