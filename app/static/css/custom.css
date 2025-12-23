@@ -748,6 +748,16 @@ textarea:focus {
     border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
+[data-theme="light"] .timeline-item {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(148, 163, 184, 0.15);
+}
+
+[data-theme="light"] .timeline-icon {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.25);
+}
+
 .status-list {
     display: flex;
     flex-direction: column;
@@ -976,6 +986,28 @@ footer {
     font-weight: 600;
     color: var(--text-primary);
     cursor: pointer;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    transition: all var(--transition-fast);
+    font-size: 0.9rem;
+}
+
+.advanced-toggle:hover {
+    background: rgba(148, 163, 184, 0.15);
+    border-color: rgba(148, 163, 184, 0.35);
+    transform: translateY(-1px);
+}
+
+[data-theme="light"] .advanced-toggle {
+    background: rgba(99, 102, 241, 0.06);
+    border-color: rgba(99, 102, 241, 0.2);
+}
+
+[data-theme="light"] .advanced-toggle:hover {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.35);
 }
 
 .advanced-toggle svg {

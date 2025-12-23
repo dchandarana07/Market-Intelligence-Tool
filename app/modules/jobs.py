@@ -122,13 +122,13 @@ class JobsModule(BaseModule):
                 required=False,
                 default="month",
                 options=[
-                    {"value": "today", "label": "Past 24 hours"},
-                    {"value": "3days", "label": "Past 3 days"},
+                    {"value": "month", "label": "Past month (Recommended)"},
                     {"value": "week", "label": "Past week"},
-                    {"value": "month", "label": "Past month"},
+                    {"value": "3days", "label": "Past 3 days"},
+                    {"value": "today", "label": "Past 24 hours"},
                 ],
                 is_advanced=True,
-                help_text="Filter by posting date",
+                help_text="Filter by posting date (Past month recommended for better results)",
             ),
             InputField(
                 name="include_bls",
@@ -189,11 +189,43 @@ class JobsModule(BaseModule):
             result.add_error("query", "Search keywords are required")
         elif len(query) < 2:
             result.add_error("query", "Search keywords must be at least 2 characters")
+        elif len(query) > 200:
+            result.add_error("query", "Search keywords must be less than 200 characters")
+
+        # Optional but validate if provided: location
+        location = inputs.get("location", "").strip()
+        if location and len(location) < 2:
+            result.add_error("location", "Location must be at least 2 characters if provided")
+        elif location and len(location) > 100:
+            result.add_error("location", "Location must be less than 100 characters")
 
         # Optional: results_limit
         results_limit = inputs.get("results_limit", 20)
-        if not isinstance(results_limit, int) or results_limit < 5 or results_limit > 100:
+        if not isinstance(results_limit, int):
+            result.add_error("results_limit", "Results limit must be a number")
+        elif results_limit < 5 or results_limit > 100:
             result.add_error("results_limit", "Results limit must be between 5 and 100")
+
+        # Validate employment_type
+        employment_type = inputs.get("employment_type", "all")
+        valid_types = ["all", "FULLTIME", "PARTTIME", "CONTRACTOR", "INTERN"]
+        if employment_type not in valid_types:
+            result.add_error("employment_type", f"Employment type must be one of: {', '.join(valid_types)}")
+
+        # Validate date_posted
+        date_posted = inputs.get("date_posted", "month")
+        valid_dates = ["today", "3days", "week", "month"]
+        if date_posted not in valid_dates:
+            result.add_error("date_posted", f"Date posted must be one of: {', '.join(valid_dates)}")
+
+        # Validate boolean fields
+        include_bls = inputs.get("include_bls", True)
+        if not isinstance(include_bls, bool):
+            result.add_error("include_bls", "Include BLS must be a checkbox value (true/false)")
+
+        extract_skills = inputs.get("extract_skills", True)
+        if not isinstance(extract_skills, bool):
+            result.add_error("extract_skills", "Extract skills must be a checkbox value (true/false)")
 
         return result
 
@@ -592,11 +624,39 @@ class JobsModule(BaseModule):
             if col not in df.columns:
                 df[col] = ""
 
+        # Format data for stakeholder readability
+        if not df.empty:
+            # Format employment with commas
+            if "employment" in df.columns:
+                df["employment"] = df["employment"].apply(
+                    lambda x: f"{int(x):,}" if x and str(x).isdigit() else x
+                )
+
+            # Format wages with dollar signs and commas
+            if "mean_annual_wage" in df.columns:
+                df["mean_annual_wage"] = df["mean_annual_wage"].apply(
+                    lambda x: f"${int(x):,}" if x and str(x).replace(".", "").isdigit() else x
+                )
+
+            if "median_hourly_wage" in df.columns:
+                df["median_hourly_wage"] = df["median_hourly_wage"].apply(
+                    lambda x: f"${float(x):,.2f}/hr" if x and str(x).replace(".", "").isdigit() else x
+                )
+
+            # Rename columns for clarity
+            df = df.rename(columns={
+                "soc_code": "SOC Code",
+                "occupation_title": "Occupation Title",
+                "employment": "Total Employment (US)",
+                "mean_annual_wage": "Average Annual Salary",
+                "median_hourly_wage": "Median Hourly Wage"
+            })
+
         # Log the data we found
         for _, row in df.iterrows():
-            logger.debug(f"[BLS] {row.get('occupation_title', 'Unknown')}: "
-                        f"employment={row.get('employment', 'N/A')}, "
-                        f"wage=${row.get('mean_annual_wage', 'N/A')}")
+            logger.debug(f"[BLS] {row.get('Occupation Title', 'Unknown')}: "
+                        f"employment={row.get('Total Employment (US)', 'N/A')}, "
+                        f"wage={row.get('Average Annual Salary', 'N/A')}")
 
         return df
 

@@ -166,38 +166,53 @@ class GoogleSheetsService:
             "parents": [settings.google_drive_folder_id],  # Create directly in folder
         }
 
-        file = drive_service.files().create(
-            body=file_metadata,
-            fields="id, webViewLink",
-        ).execute()
+        try:
+            file = drive_service.files().create(
+                body=file_metadata,
+                fields="id, webViewLink",
+            ).execute()
 
-        spreadsheet_id = file.get("id")
-        spreadsheet_url = file.get("webViewLink", f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+            spreadsheet_id = file.get("id")
+            spreadsheet_url = file.get("webViewLink", f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
 
-        logger.info(f"Spreadsheet created with ID: {spreadsheet_id}")
+            logger.info(f"Spreadsheet created with ID: {spreadsheet_id}")
+        except Exception as e:
+            logger.error(f"Failed to create spreadsheet file: {e}", exc_info=True)
+            raise RuntimeError(f"Failed to create spreadsheet in Google Drive: {str(e)}") from e
 
         # Now open it with gspread to write data
-        client = self._get_client()
-        spreadsheet = client.open_by_key(spreadsheet_id)
+        try:
+            client = self._get_client()
+            spreadsheet = client.open_by_key(spreadsheet_id)
+            logger.info(f"Opened spreadsheet with gspread successfully")
 
-        # Write data to sheets
-        self._write_data_to_sheets(spreadsheet, data)
+            # Write data to sheets
+            self._write_data_to_sheets(spreadsheet, data)
+            logger.info(f"Data written to spreadsheet successfully")
+        except Exception as e:
+            logger.error(f"Failed to write data to spreadsheet: {e}", exc_info=True)
+            # Even if writing data fails, return the spreadsheet URL so user can access it
+            logger.warning(f"Spreadsheet created but data writing failed. User can still access empty sheet.")
 
-        # Set sharing permissions
+        # Set sharing permissions - give user EDITOR access
         shared_with_list = []
-        if sharing_mode == "anyone":
-            spreadsheet.share("", perm_type="anyone", role="reader")
-            shared_with_list.append("Anyone with link")
-            logger.info("Shared with anyone who has the link")
-        elif share_with:
-            spreadsheet.share(
-                share_with,
-                perm_type="user",
-                role="reader",
-                notify=notify,
-            )
-            shared_with_list.append(share_with)
-            logger.info(f"Shared with: {share_with}")
+        try:
+            if sharing_mode == "anyone":
+                spreadsheet.share("", perm_type="anyone", role="writer")
+                shared_with_list.append("Anyone with link (Editor)")
+                logger.info("Shared with anyone who has the link (Editor access)")
+            elif share_with:
+                spreadsheet.share(
+                    share_with,
+                    perm_type="user",
+                    role="writer",  # Changed from "reader" to "writer" for editor access
+                    notify=notify,
+                )
+                shared_with_list.append(share_with)
+                logger.info(f"Shared with: {share_with} (Editor access)")
+        except Exception as e:
+            logger.warning(f"Failed to set sharing permissions: {e}", exc_info=True)
+            # Don't fail the whole operation if sharing fails
 
         return {
             "spreadsheet_id": spreadsheet_id,
@@ -350,17 +365,23 @@ def get_sheets_service():
     """
     Get the sheets service instance.
 
-    Prefers OAuth service (uses user's Drive quota) over service account
-    (which has quota restrictions in some Google Cloud configurations).
+    In production, always uses service account credentials (from file or env var).
+    OAuth is only used in development when explicitly configured.
     """
-    from app.services.google_sheets_oauth import get_oauth_sheets_service, CREDENTIALS_PATH
+    global _sheets_service
 
-    # Use OAuth service if credentials exist
+    # In production, always use service account
+    if settings.environment == "production":
+        if _sheets_service is None:
+            _sheets_service = GoogleSheetsService()
+        return _sheets_service
+
+    # In development, prefer OAuth if available (uses user's Drive quota)
+    from app.services.google_sheets_oauth import get_oauth_sheets_service, CREDENTIALS_PATH
     if CREDENTIALS_PATH.exists():
         return get_oauth_sheets_service()
 
     # Fall back to service account
-    global _sheets_service
     if _sheets_service is None:
         _sheets_service = GoogleSheetsService()
     return _sheets_service

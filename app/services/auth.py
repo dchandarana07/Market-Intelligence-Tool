@@ -75,7 +75,7 @@ class GoogleAuthService:
         flow = self.create_flow(redirect_uri)
         authorization_url, _ = flow.authorization_url(
             access_type="offline",
-            include_granted_scopes="true",
+            include_granted_scopes="false",  # Only request explicitly defined scopes
             state=state,
             prompt="select_account",  # Force account selection
         )

@@ -185,6 +185,7 @@ class PipelineOrchestrator:
 
         # Track extracted skills for passing to dependent modules
         extracted_skills: list[str] = []
+        trend_terms: list[str] = []  # Terms from Trends module for reuse in Lightcast
         all_results: dict[str, ModuleResult] = {}
 
         # Execute modules in order
@@ -207,8 +208,12 @@ class PipelineOrchestrator:
                 # Get inputs for this module
                 inputs = module_inputs.get(module_name, {})
 
-                # Execute module (some modules accept job_skills parameter)
-                if module_name in ["trends", "lightcast"] and extracted_skills:
+                # Execute module with context from previous modules
+                if module_name == "lightcast":
+                    # Lightcast can use skills from jobs or terms from trends
+                    result = await module.execute(inputs, job_skills=extracted_skills, trend_terms=trend_terms)
+                elif module_name == "trends" and extracted_skills:
+                    # Trends can use skills from jobs (but now requires manual input)
                     result = await module.execute(inputs, job_skills=extracted_skills)
                 else:
                     result = await module.execute(inputs)
@@ -225,6 +230,14 @@ class PipelineOrchestrator:
                     if skills_df is not None and not skills_df.empty:
                         extracted_skills = skills_df["skill"].tolist()
                         logger.info(f"Extracted {len(extracted_skills)} skills from jobs")
+
+                # Extract terms from trends for Lightcast module
+                if module_name == "trends" and result.status in [ModuleStatus.COMPLETED, ModuleStatus.PARTIAL]:
+                    # Get the terms from the trend summary
+                    summary_df = result.data.get("Trend Summary")
+                    if summary_df is not None and not summary_df.empty and "term" in summary_df.columns:
+                        trend_terms = summary_df["term"].unique().tolist()
+                        logger.info(f"Extracted {len(trend_terms)} terms from trends for reuse")
 
                 if result.status == ModuleStatus.COMPLETED:
                     progress.message = f"Completed successfully ({result.total_rows} rows)"
@@ -300,19 +313,43 @@ class PipelineOrchestrator:
                         full_name = full_name[:100]
                         all_data[full_name] = df
 
+        # If no successful data, create a summary sheet with error information
         if not all_data:
-            raise RuntimeError("No data to export. All modules failed or returned empty results.")
+            logger.warning("No module data available, creating summary-only spreadsheet")
+            # Create a summary dataframe with run information
+            summary_data = {
+                "Run Summary": pd.DataFrame({
+                    "Topic": [run.topic],
+                    "Status": ["Failed - No data collected"],
+                    "Modules Run": [", ".join(run.progress.keys())],
+                    "Errors": ["; ".join(run.errors) if run.errors else "Unknown error"],
+                    "Started": [run.started_at.strftime("%Y-%m-%d %H:%M:%S")],
+                    "Completed": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                })
+            }
+            all_data = summary_data
 
         # Create the spreadsheet
         title = f"Market Intelligence - {run.topic}"
-        output_info = sheets_service.create_output(
-            title=title,
-            data=all_data,
-            share_with=run.user_email,
-            sharing_mode=run.sharing_mode,
-        )
-
-        return output_info
+        try:
+            output_info = sheets_service.create_output(
+                title=title,
+                data=all_data,
+                share_with=run.user_email,
+                sharing_mode=run.sharing_mode,
+            )
+            logger.info(f"Successfully created spreadsheet: {output_info.get('spreadsheet_url')}")
+            return output_info
+        except Exception as e:
+            logger.error(f"Failed to create spreadsheet: {e}", exc_info=True)
+            # Return a minimal output info so the run doesn't completely fail
+            return {
+                "spreadsheet_id": None,
+                "spreadsheet_url": None,
+                "folder_url": None,
+                "shared_with": [],
+                "error": str(e),
+            }
 
     def _notify_progress(self, run_id: str, progress: ModuleProgress) -> None:
         """Notify progress callback if configured."""

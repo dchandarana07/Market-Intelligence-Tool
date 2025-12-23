@@ -57,8 +57,8 @@ class LightcastModule(BaseModule):
     @property
     def description(self) -> str:
         return (
-            "Normalize and enrich skills using Lightcast's Skills API. "
-            "Maps raw skill mentions to standardized taxonomy."
+            "Find Related Skills using Lightcast's Skills API. "
+            "Discovers other skills that are often found together with your input skills."
         )
 
     @property
@@ -66,57 +66,38 @@ class LightcastModule(BaseModule):
         return [
             InputField(
                 name="skills",
-                label="Skills to Normalize",
+                label="Skills to Analyze",
                 field_type="text",
-                required=False,  # Can be auto-populated from jobs
-                placeholder="e.g., python, machine learning, project mgmt",
-                help_text="Comma-separated skills. Leave empty to use skills from Jobs module.",
+                required=True,
+                placeholder="e.g., Data Science, Data Analysis, Machine Learning",
+                help_text="Enter skills to find related skills that are often found together",
             ),
             InputField(
-                name="auto_from_jobs",
-                label="Auto-populate from Jobs",
-                field_type="checkbox",
-                required=False,
-                default=True,
-                help_text="Use skills extracted from job postings",
-            ),
-            InputField(
-                name="max_skills",
-                label="Max Skills to Process",
+                name="max_related",
+                label="Max Related Skills to Show",
                 field_type="number",
                 required=False,
-                default=30,
+                default=10,
                 min_value=5,
-                max_value=50,
-                help_text="Maximum number of skills to normalize (5-50). Free tier: 50/month total.",
-            ),
-            InputField(
-                name="include_related",
-                label="Include Related Skills",
-                field_type="checkbox",
-                required=False,
-                default=False,
-                is_advanced=True,
-                help_text="Fetch related skills for each normalized skill (uses more API calls)",
+                max_value=20,
+                help_text="Number of related skills to return (5-20)",
             ),
         ]
 
     @property
     def output_columns(self) -> dict[str, list[OutputColumn]]:
         return {
-            "Skills Normalized": [
-                OutputColumn("raw_skill", "Original skill text", "string"),
+            "Input Skills": [
+                OutputColumn("skill_name", "Skill entered", "string"),
                 OutputColumn("lightcast_id", "Lightcast skill ID", "string"),
-                OutputColumn("canonical_name", "Standardized skill name", "string"),
-                OutputColumn("skill_type", "Skill type (Hard/Soft/Certification)", "string"),
-                OutputColumn("category", "Skill category", "string"),
-                OutputColumn("subcategory", "Skill subcategory", "string"),
-                OutputColumn("match_confidence", "Confidence of match", "string"),
+                OutputColumn("skill_type", "Skill type", "string"),
+                OutputColumn("category", "Category", "string"),
             ],
-            "Skills Summary": [
-                OutputColumn("category", "Skill category", "string"),
-                OutputColumn("count", "Number of skills in category", "number"),
-                OutputColumn("skills_list", "Skills in this category", "string"),
+            "Related Skills": [
+                OutputColumn("skill_name", "Related skill name", "string"),
+                OutputColumn("skill_type", "Skill type", "string"),
+                OutputColumn("category", "Category", "string"),
+                OutputColumn("description", "What this skill involves", "string"),
             ],
         }
 
@@ -124,13 +105,15 @@ class LightcastModule(BaseModule):
         result = ValidationResult.success()
 
         skills = inputs.get("skills", "").strip()
-        auto_from_jobs = inputs.get("auto_from_jobs", True)
 
-        if not skills and not auto_from_jobs:
-            result.add_error(
-                "skills",
-                "Either provide skills or enable 'Auto-populate from Jobs'"
-            )
+        if not skills:
+            result.add_error("skills", "Skills are required")
+        elif len(skills) < 2:
+            result.add_error("skills", "Skills must be at least 2 characters")
+
+        max_related = inputs.get("max_related", 10)
+        if not isinstance(max_related, int) or max_related < 5 or max_related > 20:
+            result.add_error("max_related", "Max related skills must be between 5 and 20")
 
         return result
 
@@ -150,46 +133,20 @@ class LightcastModule(BaseModule):
         self,
         inputs: dict[str, Any],
         job_skills: Optional[list[str]] = None,
+        trend_terms: Optional[list[str]] = None,
     ) -> ModuleResult:
-        """Execute the Lightcast module."""
-        logger.info("[Lightcast] Starting Lightcast module execution")
+        """Execute the Lightcast Related Skills module."""
+        logger.info("[Lightcast] Starting Lightcast Related Skills module")
         started_at = datetime.now()
         errors = []
         warnings = []
 
         skills_input = inputs.get("skills", "").strip()
-        auto_from_jobs = inputs.get("auto_from_jobs", True)
-        max_skills = inputs.get("max_skills", 30)
-        include_related = inputs.get("include_related", False)
+        max_related = inputs.get("max_related", 10)
 
-        logger.debug(f"[Lightcast] Inputs: skills_input='{skills_input[:50] if skills_input else ''}', "
-                    f"auto_from_jobs={auto_from_jobs}, max_skills={max_skills}")
-
-        # Determine skills to process
-        skills = []
-        if skills_input:
-            skills = [s.strip() for s in skills_input.split(",") if s.strip()]
-            logger.info(f"[Lightcast] Using {len(skills)} skills from manual input")
-        elif auto_from_jobs and job_skills:
-            # Use unique skills from jobs
-            skills = list(dict.fromkeys(job_skills))  # Preserve order, remove duplicates
-            logger.info(f"[Lightcast] Using {len(skills)} skills from jobs module")
-
-        if not skills:
-            logger.error("[Lightcast] No skills to process")
-            errors.append(
-                "No skills provided and no job skills available. "
-                "Either enter skills manually or run the Jobs module first."
-            )
-            return ModuleResult.failure(errors)
-
-        # Limit to max_skills
-        original_count = len(skills)
-        skills = skills[:max_skills]
-        if original_count > max_skills:
-            logger.info(f"[Lightcast] Limited skills from {original_count} to {max_skills}")
-
-        logger.info(f"[Lightcast] Processing {len(skills)} skills: {skills[:5]}{'...' if len(skills) > 5 else ''}")
+        # Parse input skills
+        skills = [s.strip() for s in skills_input.split(",") if s.strip()]
+        logger.info(f"[Lightcast] Processing {len(skills)} input skills: {skills}")
 
         # Get access token
         try:
@@ -201,90 +158,90 @@ class LightcastModule(BaseModule):
             errors.append(f"Lightcast authentication failed: {str(e)}")
             return ModuleResult.failure(errors)
 
-        # Normalize skills
-        normalized_skills = []
-        success_count = 0
-        for i, skill in enumerate(skills):
+        # Step 1: Normalize input skills to get Lightcast IDs
+        input_skills_data = []
+        skill_ids = []
+
+        for skill in skills:
             try:
-                logger.debug(f"[Lightcast] Normalizing skill {i+1}/{len(skills)}: '{skill}'")
-                result = await self._normalize_skill(skill)
-                if result:
-                    normalized_skills.append(result)
-                    success_count += 1
-                    logger.debug(f"[Lightcast] Normalized '{skill}' -> '{result.get('canonical_name')}'")
-                else:
-                    normalized_skills.append({
-                        "raw_skill": skill,
-                        "lightcast_id": "",
-                        "canonical_name": skill,  # Use original if not found
-                        "skill_type": "Unknown",
-                        "category": "",
-                        "subcategory": "",
-                        "match_confidence": "Not Found",
+                logger.debug(f"[Lightcast] Normalizing skill: '{skill}'")
+                normalized = await self._normalize_skill(skill)
+                if normalized:
+                    input_skills_data.append({
+                        "skill_name": normalized.get("canonical_name", skill),
+                        "lightcast_id": normalized.get("lightcast_id", ""),
+                        "skill_type": normalized.get("skill_type", ""),
+                        "category": normalized.get("category", ""),
                     })
-                    logger.debug(f"[Lightcast] No match found for '{skill}'")
-                # Rate limit: 5 requests/second
-                await asyncio.sleep(0.25)
+                    skill_ids.append(normalized.get("lightcast_id"))
+                    logger.info(f"[Lightcast] Normalized '{skill}' -> ID: {normalized.get('lightcast_id')}")
+                else:
+                    warnings.append(f"Could not find skill: {skill}")
+                    logger.warning(f"[Lightcast] No match found for '{skill}'")
+
+                await asyncio.sleep(0.25)  # Rate limit
 
             except Exception as e:
                 logger.warning(f"[Lightcast] Error normalizing skill '{skill}': {type(e).__name__}: {e}")
-                warnings.append(f"Could not normalize: {skill}")
-                normalized_skills.append({
-                    "raw_skill": skill,
-                    "lightcast_id": "",
-                    "canonical_name": skill,
-                    "skill_type": "Error",
-                    "category": "",
-                    "subcategory": "",
-                    "match_confidence": "Error",
+                warnings.append(f"Error processing: {skill}")
+
+        if not skill_ids:
+            errors.append("No valid skills found. Please check skill names.")
+            return ModuleResult.failure(errors)
+
+        # Step 2: Get related skills
+        logger.info(f"[Lightcast] Finding related skills for {len(skill_ids)} normalized skills")
+        related_skills_data = []
+
+        try:
+            related_skills = await self._get_related_skills(skill_ids, max_related)
+            logger.info(f"[Lightcast] Found {len(related_skills)} related skills")
+
+            for skill_info in related_skills:
+                related_skills_data.append({
+                    "skill_name": skill_info.get("name", ""),
+                    "skill_type": skill_info.get("type", {}).get("name", ""),
+                    "category": skill_info.get("category", {}).get("name", ""),
+                    "description": skill_info.get("description", "")[:200],  # Truncate long descriptions
                 })
 
-        logger.info(f"[Lightcast] Normalized {success_count}/{len(skills)} skills successfully")
+        except Exception as e:
+            logger.error(f"[Lightcast] Error fetching related skills: {type(e).__name__}: {e}")
+            warnings.append(f"Could not fetch related skills: {str(e)}")
 
         # Create DataFrames
-        skills_df = pd.DataFrame(normalized_skills)
-
-        # Create category summary
-        summary_rows = []
-        if not skills_df.empty and "category" in skills_df.columns:
-            category_groups = skills_df.groupby("category")
-            for category, group in category_groups:
-                if category:  # Skip empty categories
-                    summary_rows.append({
-                        "category": category,
-                        "count": len(group),
-                        "skills_list": ", ".join(group["canonical_name"].tolist()[:10]),
-                    })
-
-        summary_df = pd.DataFrame(summary_rows)
+        input_df = pd.DataFrame(input_skills_data)
+        related_df = pd.DataFrame(related_skills_data)
 
         data = {
-            "Skills Normalized": skills_df,
-            "Skills Summary": summary_df,
+            "Input Skills": input_df,
+            "Related Skills": related_df,
         }
 
         completed_at = datetime.now()
 
-        if warnings:
+        if errors:
+            return ModuleResult.failure(errors)
+        elif warnings:
             return ModuleResult(
-                status=ModuleStatus.PARTIAL if len(warnings) > len(skills) / 2 else ModuleStatus.COMPLETED,
+                status=ModuleStatus.PARTIAL if not related_skills_data else ModuleStatus.COMPLETED,
                 data=data,
                 warnings=warnings,
                 metadata={
-                    "skills_processed": len(skills),
-                    "skills_normalized": len([s for s in normalized_skills if s.get("lightcast_id")]),
+                    "input_skills": len(input_skills_data),
+                    "related_skills": len(related_skills_data),
                 },
                 started_at=started_at,
                 completed_at=completed_at,
             )
-
-        return ModuleResult.success(
-            data=data,
-            metadata={
-                "skills_processed": len(skills),
-                "skills_normalized": len([s for s in normalized_skills if s.get("lightcast_id")]),
-            },
-        )
+        else:
+            return ModuleResult.success(
+                data=data,
+                metadata={
+                    "input_skills": len(input_skills_data),
+                    "related_skills": len(related_skills_data),
+                },
+            )
 
     async def _ensure_access_token(self) -> str:
         """Ensure we have a valid access token."""
@@ -372,38 +329,40 @@ class LightcastModule(BaseModule):
             "match_confidence": "High" if skill.lower() == skill_info.get("name", "").lower() else "Partial",
         }
 
-    async def extract_skills_from_text(self, text: str) -> list[dict]:
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.5, min=1, max=5),
+    )
+    async def _get_related_skills(self, skill_ids: list[str], limit: int = 10) -> list[dict]:
         """
-        Extract skills from a text block using Lightcast extraction API.
+        Get related skills using Lightcast API.
 
-        Note: This uses the skill extraction quota (50/month free).
+        Uses the skills/related endpoint to find skills that are often found together.
         """
         token = await self._ensure_access_token()
 
-        extract_url = "https://emsiservices.com/skills/versions/latest/extract"
+        # Use the related skills endpoint
+        related_url = "https://emsiservices.com/skills/versions/latest/related"
 
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
 
+        # Build request payload - send skill IDs to find related skills
         payload = {
-            "text": text,
-            "confidenceThreshold": 0.6,
+            "ids": skill_ids,
+            "limit": limit,
         }
 
+        logger.debug(f"[Lightcast] Requesting related skills for IDs: {skill_ids}")
+
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(extract_url, json=payload, headers=headers)
+            response = await client.post(related_url, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
 
-        extracted = []
-        for skill in data.get("data", []):
-            extracted.append({
-                "lightcast_id": skill.get("skill", {}).get("id", ""),
-                "canonical_name": skill.get("skill", {}).get("name", ""),
-                "skill_type": skill.get("skill", {}).get("type", {}).get("name", ""),
-                "confidence": skill.get("confidence", 0),
-            })
+        related_skills = data.get("data", [])
+        logger.info(f"[Lightcast] Retrieved {len(related_skills)} related skills")
 
-        return extracted
+        return related_skills

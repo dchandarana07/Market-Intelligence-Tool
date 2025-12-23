@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: market-intelligence-tool
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: ENVIRONMENT
+        value: production

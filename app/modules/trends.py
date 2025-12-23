@@ -79,17 +79,9 @@ class TrendsModule(BaseModule):
                 name="terms",
                 label="Search Terms",
                 field_type="text",
-                required=False,  # Can be auto-populated from jobs
+                required=True,  # Required - user must provide terms
                 placeholder="e.g., python, machine learning, data science",
-                help_text="Comma-separated list of terms to track (max 5). Leave empty to use skills from Jobs module.",
-            ),
-            InputField(
-                name="auto_from_jobs",
-                label="Auto-populate from Jobs",
-                field_type="checkbox",
-                required=False,
-                default=True,
-                help_text="Use top skills extracted from job postings",
+                help_text="Comma-separated list of search terms to track (max 5)",
             ),
             InputField(
                 name="max_terms",
@@ -145,25 +137,23 @@ class TrendsModule(BaseModule):
     @property
     def output_columns(self) -> dict[str, list[OutputColumn]]:
         return {
-            "Trend Data": [
-                OutputColumn("date", "Date point", "date"),
+            "Trends Summary": [
                 OutputColumn("term", "Search term", "string"),
-                OutputColumn("interest", "Search interest (0-100)", "number"),
-                OutputColumn("is_partial", "Is data partial", "string"),
-            ],
-            "Trend Summary": [
-                OutputColumn("term", "Search term", "string"),
-                OutputColumn("avg_interest", "Average interest over period", "number"),
-                OutputColumn("max_interest", "Peak interest", "number"),
-                OutputColumn("min_interest", "Lowest interest", "number"),
+                OutputColumn("avg_interest", "Average interest", "number"),
+                OutputColumn("peak_interest", "Peak interest", "number"),
                 OutputColumn("current_interest", "Most recent interest", "number"),
-                OutputColumn("trend_direction", "Rising/Stable/Declining", "string"),
+                OutputColumn("trend_direction", "Trending direction", "string"),
+            ],
+            # Individual trend data sheets created dynamically per term
+            "Trend Over Time": [
+                OutputColumn("date", "Date", "date"),
+                OutputColumn("interest", "Search interest (0-100)", "number"),
             ],
             "Related Queries": [
-                OutputColumn("term", "Original search term", "string"),
+                OutputColumn("term", "Original term", "string"),
                 OutputColumn("related_query", "Related search query", "string"),
                 OutputColumn("query_type", "Top or Rising", "string"),
-                OutputColumn("value", "Relevance score or growth %", "string"),
+                OutputColumn("relevance", "Relevance score/growth", "string"),
             ],
         }
 
@@ -171,20 +161,18 @@ class TrendsModule(BaseModule):
         result = ValidationResult.success()
 
         terms = inputs.get("terms", "").strip()
-        auto_from_jobs = inputs.get("auto_from_jobs", True)
 
-        # Either terms or auto_from_jobs must be provided
-        if not terms and not auto_from_jobs:
-            result.add_error(
-                "terms",
-                "Either provide search terms or enable 'Auto-populate from Jobs'"
-            )
+        # Terms are required
+        if not terms:
+            result.add_error("terms", "Search terms are required")
+            return result
 
-        # If terms provided, validate count
-        if terms:
-            term_list = [t.strip() for t in terms.split(",") if t.strip()]
-            if len(term_list) > 5:
-                result.add_error("terms", "Maximum 5 terms can be compared at once")
+        # Validate term count
+        term_list = [t.strip() for t in terms.split(",") if t.strip()]
+        if len(term_list) == 0:
+            result.add_error("terms", "At least one search term is required")
+        elif len(term_list) > 5:
+            result.add_error("terms", "Maximum 5 terms can be compared at once")
 
         return result
 
@@ -203,33 +191,20 @@ class TrendsModule(BaseModule):
 
         # Get search terms
         terms_input = inputs.get("terms", "").strip()
-        auto_from_jobs = inputs.get("auto_from_jobs", True)
         max_terms = inputs.get("max_terms", 5)
         timeframe = inputs.get("timeframe", "today 12-m")
         geo = inputs.get("geo", "US")
         include_related = inputs.get("include_related", True)
 
-        # Determine final terms list
-        terms = []
-        if terms_input:
-            terms = [t.strip() for t in terms_input.split(",") if t.strip()]
-        elif auto_from_jobs and job_skills:
-            # Use top skills from job postings
-            terms = job_skills[:max_terms]
-            logger.info(f"Using skills from jobs: {terms}")
-        else:
-            errors.append(
-                "No search terms provided and no job skills available. "
-                "Either enter terms manually or run the Jobs module first."
-            )
+        # Parse and validate terms
+        terms = [t.strip() for t in terms_input.split(",") if t.strip()]
+        if not terms:
+            errors.append("No valid search terms provided")
             return ModuleResult.failure(errors)
 
         # Limit to max_terms
         terms = terms[:max_terms]
-
-        if not terms:
-            errors.append("No valid search terms provided")
-            return ModuleResult.failure(errors)
+        logger.info(f"[Trends] Tracking {len(terms)} terms: {terms}")
 
         # Fetch trends data
         try:
@@ -244,11 +219,25 @@ class TrendsModule(BaseModule):
             errors.append(f"Failed to fetch Google Trends data: {str(e)}")
             return ModuleResult.failure(errors)
 
-        data = {
-            "Trend Data": trend_data,
-            "Trend Summary": trend_summary,
-        }
+        # Assemble output data - create separate sheets for each term
+        data = {}
 
+        # Add summary first
+        if not trend_summary.empty:
+            data["Trends Summary"] = trend_summary
+
+        # Create separate sheet for each term's time series data (better for charts)
+        if not trend_data.empty:
+            term_list = [t.strip() for t in terms.split(",") if t.strip()]
+            for term in term_list:
+                term_df = trend_data[trend_data["term"] == term].copy()
+                if not term_df.empty:
+                    # Drop the term column since it's redundant (sheet name has it)
+                    term_df = term_df[["date", "interest"]]
+                    sheet_name = f"Trend - {term.title()}"
+                    data[sheet_name] = term_df
+
+        # Add related queries if available
         if include_related and not related_queries.empty:
             data["Related Queries"] = related_queries
 
@@ -263,6 +252,7 @@ class TrendsModule(BaseModule):
                     "terms": terms,
                     "timeframe": timeframe,
                     "geo": geo,
+                    "terms_analyzed": len(terms.split(",")),
                 },
                 started_at=started_at,
                 completed_at=completed_at,
@@ -274,6 +264,7 @@ class TrendsModule(BaseModule):
                 "terms": terms,
                 "timeframe": timeframe,
                 "geo": geo,
+                "terms_analyzed": len(terms.split(",")),
             },
         )
 
@@ -356,11 +347,10 @@ class TrendsModule(BaseModule):
             logger.warning("[Trends/SerpAPI] No timeline data returned")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-        # Convert to our format
+        # Convert to our format - structure by term for better visualization
         trend_rows = []
         for point in timeline_data:
             date = point.get("date", "")
-            is_partial = point.get("partial_data", False)
 
             for value_info in point.get("values", []):
                 term = value_info.get("query", "")
@@ -369,7 +359,6 @@ class TrendsModule(BaseModule):
                     "date": date,
                     "term": term,
                     "interest": interest,
-                    "is_partial": str(is_partial),
                 })
 
         trend_data = pd.DataFrame(trend_rows)
@@ -399,8 +388,7 @@ class TrendsModule(BaseModule):
                 summary_rows.append({
                     "term": term,
                     "avg_interest": avg,
-                    "max_interest": int(interests.max()),
-                    "min_interest": int(interests.min()),
+                    "peak_interest": int(interests.max()),
                     "current_interest": current,
                     "trend_direction": direction,
                 })
@@ -491,7 +479,6 @@ class TrendsModule(BaseModule):
                         "date": date_idx.strftime("%Y-%m-%d"),
                         "term": term,
                         "interest": int(interest_df.loc[date_idx, term]),
-                        "is_partial": str(interest_df.loc[date_idx, "isPartial"]) if "isPartial" in interest_df.columns else "False",
                     })
 
         trend_data = pd.DataFrame(trend_rows)
@@ -517,8 +504,7 @@ class TrendsModule(BaseModule):
                 summary_rows.append({
                     "term": term,
                     "avg_interest": avg,
-                    "max_interest": int(series.max()),
-                    "min_interest": int(series.min()),
+                    "peak_interest": int(series.max()),
                     "current_interest": current,
                     "trend_direction": direction,
                 })

@@ -149,19 +149,44 @@ class CoursesModule(BaseModule):
     def validate_inputs(self, inputs: dict[str, Any]) -> ValidationResult:
         result = ValidationResult.success()
 
+        # Required: keywords
         keywords = inputs.get("keywords", "").strip()
         if not keywords:
             result.add_error("keywords", "Search keywords are required")
         elif len(keywords) < 2:
             result.add_error("keywords", "Search keywords must be at least 2 characters")
+        elif len(keywords) > 200:
+            result.add_error("keywords", "Search keywords must be less than 200 characters")
 
+        # Validate max_results
         max_results = inputs.get("max_results", 15)
-        if not isinstance(max_results, int) or max_results < 5 or max_results > 50:
+        if not isinstance(max_results, int):
+            result.add_error("max_results", "Maximum results must be a number")
+        elif max_results < 5 or max_results > 50:
             result.add_error("max_results", "Maximum results must be between 5 and 50")
 
+        # Validate sources
         sources = inputs.get("sources", [])
         if not sources:
             result.add_error("sources", "At least one course platform must be selected")
+        elif not isinstance(sources, list):
+            result.add_error("sources", "Course platforms must be a list")
+        else:
+            valid_sources = ["coursera", "edx"]
+            invalid_sources = [s for s in sources if s not in valid_sources]
+            if invalid_sources:
+                result.add_error("sources", f"Invalid course platforms: {', '.join(invalid_sources)}. Must be 'coursera' or 'edx'")
+
+        # Validate level
+        level = inputs.get("level", "all")
+        valid_levels = ["all", "beginner", "intermediate", "advanced"]
+        if level not in valid_levels:
+            result.add_error("level", f"Course level must be one of: {', '.join(valid_levels)}")
+
+        # Validate boolean field
+        include_certificates = inputs.get("include_certificates", False)
+        if not isinstance(include_certificates, bool):
+            result.add_error("include_certificates", "Include certificates must be a checkbox value (true/false)")
 
         return result
 
