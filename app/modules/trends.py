@@ -228,8 +228,8 @@ class TrendsModule(BaseModule):
 
         # Create separate sheet for each term's time series data (better for charts)
         if not trend_data.empty:
-            term_list = [t.strip() for t in terms.split(",") if t.strip()]
-            for term in term_list:
+            # terms is already a list from line 200
+            for term in terms:
                 term_df = trend_data[trend_data["term"] == term].copy()
                 if not term_df.empty:
                     # Drop the term column since it's redundant (sheet name has it)
@@ -252,7 +252,7 @@ class TrendsModule(BaseModule):
                     "terms": terms,
                     "timeframe": timeframe,
                     "geo": geo,
-                    "terms_analyzed": len(terms.split(",")),
+                    "terms_analyzed": len(terms),
                 },
                 started_at=started_at,
                 completed_at=completed_at,
@@ -264,7 +264,7 @@ class TrendsModule(BaseModule):
                 "terms": terms,
                 "timeframe": timeframe,
                 "geo": geo,
-                "terms_analyzed": len(terms.split(",")),
+                "terms_analyzed": len(terms),
             },
         )
 

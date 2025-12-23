@@ -75,7 +75,27 @@ class GoogleSheetsService:
         # Try environment variable first
         if settings.google_credentials_json:
             logger.info("Loading Google credentials from environment variable")
-            credentials_info = json.loads(settings.google_credentials_json)
+
+            try:
+                # Try to parse JSON as-is
+                credentials_info = json.loads(settings.google_credentials_json)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Google credentials JSON: {e}")
+
+                # Provide clear error message with instructions
+                raise ValueError(
+                    "Invalid JSON in GOOGLE_CREDENTIALS_JSON environment variable. "
+                    f"Error: {str(e)}\n\n"
+                    "Common causes:\n"
+                    "1. JSON contains formatting newlines/tabs (should be minified to single line)\n"
+                    "2. JSON contains unescaped control characters\n"
+                    "3. JSON was copy-pasted incorrectly\n\n"
+                    "Solutions:\n"
+                    "1. Minify your JSON to a single line: https://codebeautify.org/jsonminifier\n"
+                    "2. Or use Render's 'Secret File' feature to upload the JSON file\n"
+                    "3. Or place credentials file at: credentials/google-credentials.json"
+                ) from e
+
             return Credentials.from_service_account_info(credentials_info, scopes=SCOPES)
 
         # Fall back to file
