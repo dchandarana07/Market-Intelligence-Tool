@@ -26,7 +26,7 @@ aiohttp==3.9.3
 pytrends==4.9.2
 
 # Data Processing
-pandas==2.2.0
+pandas==2.2.3
 openpyxl==3.1.2
 
 # Email
