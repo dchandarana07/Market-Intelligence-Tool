@@ -70,20 +70,29 @@ class GoogleAuthService:
         )
         return flow
 
-    def get_authorization_url(self, redirect_uri: str, state: str) -> str:
-        """Get the authorization URL for user to visit."""
+    def get_authorization_url(self, redirect_uri: str, state: str) -> tuple[str, str]:
+        """Get the authorization URL for user to visit.
+
+        Returns:
+            Tuple of (authorization_url, code_verifier) — the code_verifier
+            must be stored in the session and passed back to fetch_token.
+        """
         flow = self.create_flow(redirect_uri)
         authorization_url, _ = flow.authorization_url(
             access_type="offline",
-            include_granted_scopes="false",  # Only request explicitly defined scopes
+            include_granted_scopes="false",
             state=state,
-            prompt="select_account",  # Force account selection
+            prompt="select_account",
         )
-        return authorization_url
+        # Extract the PKCE code_verifier so we can reuse it in fetch_token
+        code_verifier = flow.code_verifier
+        return authorization_url, code_verifier
 
-    def fetch_token(self, redirect_uri: str, authorization_response: str) -> dict:
+    def fetch_token(self, redirect_uri: str, authorization_response: str, code_verifier: str = None) -> dict:
         """Exchange authorization code for tokens."""
         flow = self.create_flow(redirect_uri)
+        if code_verifier:
+            flow.code_verifier = code_verifier
         flow.fetch_token(authorization_response=authorization_response)
 
         credentials = flow.credentials

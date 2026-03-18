@@ -3,58 +3,115 @@
 {% block title %}Market Intelligence{% endblock %}
 
 {% block content %}
-<section class="hero-block">
-    <span class="eyebrow">Market Intelligence Insights</span>
-    <h1 class="hero-title">Precision market intelligence that feels handcrafted.</h1>
-    <p class="hero-lede">Blend labor data, education supply, and demand signals into a single storyline. Everything downstream stays untouched—we simply elevate the experience.</p>
-</section>
+<div class="max-w-2xl mx-auto">
+    <!-- Hero -->
+    <div class="mb-8">
+        <p class="text-xs font-semibold tracking-[0.2em] uppercase text-asu-maroon dark:text-asu-gold mb-3">Market Intelligence Report Generator</p>
+        <h1 class="text-3xl sm:text-4xl font-bold leading-tight mb-3">What field do you want to analyze?</h1>
+        <p class="text-gray-500 dark:text-gray-400">Generate a scored market intelligence report across job postings, labor data, search trends, skills demand, and competitor courses.</p>
+    </div>
 
-<div class="max-720">
-    <div class="panel form-card">
-        {% if error %}
-        <div class="alert error" role="alert">{{ error }}</div>
-        {% endif %}
+    {% if error %}
+    <div class="mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">{{ error }}</div>
+    {% endif %}
 
-        <form action="/start" method="POST">
-            <div class="form-grid">
-                <div class="form-field">
-                    <label for="topic">Research Topic</label>
+    <!-- Main Form -->
+    <form action="/run-report" method="POST" class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl p-6 sm:p-8">
+
+        <!-- Topic Input -->
+        <div class="mb-6">
+            <label for="topic" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Research Topic</label>
+            <input
+                type="text"
+                id="topic"
+                name="topic"
+                value="{{ topic or '' }}"
+                required
+                autofocus
+                placeholder="e.g., Applied AI, Data Science, Cybersecurity"
+                class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-lg focus:outline-none focus:ring-2 focus:ring-asu-maroon dark:focus:ring-asu-gold focus:border-transparent transition"
+            >
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">This topic drives all module searches. Be specific for better results.</p>
+        </div>
+
+        <!-- Module Selection -->
+        <div class="mb-6">
+            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Modules</label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {% for module in modules %}
+                <label class="flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition
+                    {% if module.available %}
+                    border-gray-200 dark:border-gray-700 hover:border-asu-maroon dark:hover:border-asu-gold bg-white dark:bg-gray-800
+                    {% else %}
+                    border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900
+                    {% endif %}
+                ">
                     <input
-                        type="text"
-                        id="topic"
-                        name="topic"
-                        class="input-control"
-                        value="{{ topic or '' }}"
-                        required
-                        placeholder="Ex: Applied AI talent demand"
-                        autofocus
+                        type="checkbox"
+                        name="modules"
+                        value="{{ module.name }}"
+                        {% if not module.available %}disabled{% endif %}
+                        {% if module.name in ['jobs', 'courses', 'trends', 'lightcast'] and module.available %}checked{% endif %}
+                        class="w-4 h-4 rounded accent-asu-maroon"
                     >
-                    <p class="input-hint">We orchestrate the jobs, training, skills, and signals around this theme.</p>
-                </div>
-                <button type="submit" class="btn btn-primary btn-block">
-                    Launch Intelligence Workflow
-                </button>
+                    <div>
+                        <div class="text-sm font-medium">{{ module.display_name }}</div>
+                        {% if not module.available %}
+                        <div class="text-xs text-amber-500">Not configured</div>
+                        {% endif %}
+                    </div>
+                </label>
+                {% endfor %}
             </div>
-        </form>
-    </div>
-</div>
+        </div>
 
-<div class="feature-grid">
-    <div class="feature-tile">
-        <h3>Job Market Analysis</h3>
-        <p>Fresh postings and labor benchmarks across enterprise geos.</p>
-    </div>
-    <div class="feature-tile">
-        <h3>Course Discovery</h3>
-        <p>Mapped supply from top platforms with deduped metadata.</p>
-    </div>
-    <div class="feature-tile">
-        <h3>Trend Radar</h3>
-        <p>Search and hiring signals layered over time horizons.</p>
-    </div>
-    <div class="feature-tile">
-        <h3>Skills Intelligence</h3>
-        <p>Normalization, clustering, and taxonomy-ready outputs.</p>
+        <!-- Advanced Options -->
+        <details class="mb-6 group">
+            <summary class="text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:text-asu-maroon dark:hover:text-asu-gold select-none flex items-center gap-2">
+                <svg class="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                Advanced Options
+            </summary>
+            <div class="mt-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Sharing Mode</label>
+                    <select name="sharing_mode" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-asu-maroon dark:focus:ring-asu-gold">
+                        <option value="restricted" selected>Restricted (only you)</option>
+                        <option value="anyone">Anyone with link</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Max Results Per Source</label>
+                    <input type="number" name="max_results" value="15" min="5" max="50" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-asu-maroon dark:focus:ring-asu-gold">
+                </div>
+            </div>
+        </details>
+
+        <!-- Submit -->
+        <button type="submit" class="w-full py-3.5 rounded-full bg-asu-maroon hover:bg-asu-maroon-dark text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all">
+            Generate Report
+        </button>
+
+        <p class="text-xs text-gray-400 dark:text-gray-500 text-center mt-3">Takes 2-5 minutes. Results delivered to Google Sheets with full editor access.</p>
+    </form>
+
+    <!-- Feature Cards -->
+    <div class="grid grid-cols-2 gap-4 mt-8">
+        <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <h3 class="font-semibold text-sm mb-1">Job Market Analysis</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Fresh postings + BLS labor data with SOC code matching.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <h3 class="font-semibold text-sm mb-1">Course Discovery</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Coursera &amp; EdX courses with ratings and metadata.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <h3 class="font-semibold text-sm mb-1">Trend Radar</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Google Trends search signals over time.</p>
+        </div>
+        <div class="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+            <h3 class="font-semibold text-sm mb-1">Skills Intelligence</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Lightcast-enriched skill normalization and taxonomy.</p>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -8,3 +8,25 @@ services:
     envVars:
       - key: ENVIRONMENT
         value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
+      - key: GOOGLE_DRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: SERPAPI_KEY
+        sync: false
+      - key: BLS_API_KEY
+        sync: false
+      - key: LIGHTCAST_CLIENT_ID
+        sync: false
+      - key: LIGHTCAST_CLIENT_SECRET
+        sync: false
+      - key: EMAIL_SENDER
+        sync: false
+      - key: EMAIL_APP_PASSWORD
+        sync: false

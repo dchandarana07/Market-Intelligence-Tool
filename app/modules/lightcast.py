@@ -146,6 +146,17 @@ class LightcastModule(BaseModule):
 
         # Parse input skills
         skills = [s.strip() for s in skills_input.split(",") if s.strip()]
+
+        # Supplement with job skills if available and user input is sparse
+        if job_skills and len(skills) < 3:
+            # Add top job skills that aren't already in the user's list
+            user_skills_lower = {s.lower() for s in skills}
+            for js in job_skills:
+                if js.lower() not in user_skills_lower and len(skills) < 8:
+                    skills.append(js)
+                    user_skills_lower.add(js.lower())
+            logger.info(f"[Lightcast] Supplemented with job skills, total: {len(skills)}")
+
         logger.info(f"[Lightcast] Processing {len(skills)} input skills: {skills}")
 
         # Get access token
@@ -174,9 +185,9 @@ class LightcastModule(BaseModule):
                         "category": normalized.get("category", ""),
                     })
                     skill_ids.append(normalized.get("lightcast_id"))
-                    logger.info(f"[Lightcast] Normalized '{skill}' -> ID: {normalized.get('lightcast_id')}")
+                    logger.info(f"[Lightcast] Normalized '{skill}' -> '{normalized.get('canonical_name')}' (ID: {normalized.get('lightcast_id')})")
                 else:
-                    warnings.append(f"Could not find skill: {skill}")
+                    warnings.append(f"Could not find skill in Lightcast database: {skill}")
                     logger.warning(f"[Lightcast] No match found for '{skill}'")
 
                 await asyncio.sleep(0.25)  # Rate limit
@@ -186,7 +197,7 @@ class LightcastModule(BaseModule):
                 warnings.append(f"Error processing: {skill}")
 
         if not skill_ids:
-            errors.append("No valid skills found. Please check skill names.")
+            errors.append("No valid skills found in Lightcast database. Try using more specific or standard skill names (e.g., 'Machine Learning' instead of 'Applied AI').")
             return ModuleResult.failure(errors)
 
         # Step 2: Get related skills
@@ -198,11 +209,28 @@ class LightcastModule(BaseModule):
             logger.info(f"[Lightcast] Found {len(related_skills)} related skills")
 
             for skill_info in related_skills:
+                # Handle both nested and flat category/type structures
+                skill_type = skill_info.get("type", {})
+                if isinstance(skill_type, dict):
+                    skill_type_name = skill_type.get("name", "")
+                else:
+                    skill_type_name = str(skill_type) if skill_type else ""
+
+                category = skill_info.get("category", {})
+                if isinstance(category, dict):
+                    category_name = category.get("name", "")
+                else:
+                    category_name = str(category) if category else ""
+
+                description = skill_info.get("description", "")
+                if description:
+                    description = description[:200]
+
                 related_skills_data.append({
                     "skill_name": skill_info.get("name", ""),
-                    "skill_type": skill_info.get("type", {}).get("name", ""),
-                    "category": skill_info.get("category", {}).get("name", ""),
-                    "description": skill_info.get("description", "")[:200],  # Truncate long descriptions
+                    "skill_type": skill_type_name,
+                    "category": category_name,
+                    "description": description,
                 })
 
         except Exception as e:
@@ -278,55 +306,77 @@ class LightcastModule(BaseModule):
         wait=wait_exponential(multiplier=0.5, min=1, max=5),
     )
     async def _normalize_skill(self, skill: str) -> Optional[dict]:
-        """Normalize a single skill using Lightcast API."""
+        """Normalize a single skill using Lightcast API.
+
+        If the first search returns no results, tries alternative queries:
+        - Broader search with more results to find closest match
+        - Individual words from compound terms
+        """
         token = await self._ensure_access_token()
 
-        # Use the skills extraction endpoint for single skill lookup
-        # Or the autocomplete endpoint for matching
         search_url = "https://emsiservices.com/skills/versions/latest/skills"
+        headers = {"Authorization": f"Bearer {token}"}
 
-        params = {
-            "q": skill,
-            "limit": 1,
-        }
+        # Try exact search first
+        result = await self._search_skill(search_url, headers, skill, limit=1)
+        if result:
+            return result
 
-        headers = {
-            "Authorization": f"Bearer {token}",
-        }
+        # Try with more results to find a close match
+        result = await self._search_skill(search_url, headers, skill, limit=5)
+        if result:
+            return result
+
+        # For compound terms like "Applied AI", try the most meaningful word
+        words = skill.split()
+        if len(words) > 1:
+            # Try each word individually, prioritizing longer/more specific words
+            for word in sorted(words, key=len, reverse=True):
+                if len(word) >= 3:  # Skip very short words
+                    result = await self._search_skill(search_url, headers, word, limit=1)
+                    if result:
+                        logger.info(f"[Lightcast] Matched '{skill}' via sub-term '{word}' -> '{result.get('canonical_name')}'")
+                        return result
+
+        return None
+
+    async def _search_skill(self, url: str, headers: dict, query: str, limit: int) -> Optional[dict]:
+        """Search for a skill in the Lightcast API."""
+        params = {"q": query, "limit": limit}
 
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(search_url, params=params, headers=headers)
+            response = await client.get(url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json()
 
         skills_data = data.get("data", [])
-
         if not skills_data:
             return None
 
+        # Pick the best match
         skill_info = skills_data[0]
 
         # Get skill type
-        skill_type = skill_info.get("type", {}).get("name", "Unknown")
+        skill_type_obj = skill_info.get("type", {})
+        if isinstance(skill_type_obj, dict):
+            skill_type = skill_type_obj.get("name", "Unknown")
+        else:
+            skill_type = str(skill_type_obj) if skill_type_obj else "Unknown"
 
         # Get category info
         category = ""
-        subcategory = ""
         category_info = skill_info.get("category", {})
-        if category_info:
+        if isinstance(category_info, dict):
             category = category_info.get("name", "")
-            subcategory_info = skill_info.get("subcategory", {})
-            if subcategory_info:
-                subcategory = subcategory_info.get("name", "")
+        elif category_info:
+            category = str(category_info)
 
         return {
-            "raw_skill": skill,
+            "raw_skill": query,
             "lightcast_id": skill_info.get("id", ""),
-            "canonical_name": skill_info.get("name", skill),
+            "canonical_name": skill_info.get("name", query),
             "skill_type": skill_type,
             "category": category,
-            "subcategory": subcategory,
-            "match_confidence": "High" if skill.lower() == skill_info.get("name", "").lower() else "Partial",
         }
 
     @retry(

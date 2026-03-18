@@ -63,7 +63,7 @@ class TrendsModule(BaseModule):
 
     @property
     def display_name(self) -> str:
-        return "Google Trends (Skills)"
+        return "Google Trends"
 
     @property
     def description(self) -> str:
@@ -228,7 +228,6 @@ class TrendsModule(BaseModule):
 
         # Create separate sheet for each term's time series data (better for charts)
         if not trend_data.empty:
-            # terms is already a list from line 200
             for term in terms:
                 term_df = trend_data[trend_data["term"] == term].copy()
                 if not term_df.empty:
@@ -284,7 +283,7 @@ class TrendsModule(BaseModule):
         if settings.serpapi_available:
             logger.info("[Trends] Using SerpAPI for Google Trends (more reliable)")
             try:
-                return await self._fetch_trends_serpapi(terms, timeframe, geo)
+                return await self._fetch_trends_serpapi(terms, timeframe, geo, include_related)
             except Exception as e:
                 logger.warning(f"[Trends] SerpAPI failed, falling back to pytrends: {e}")
 
@@ -305,6 +304,7 @@ class TrendsModule(BaseModule):
         terms: list[str],
         timeframe: str,
         geo: str,
+        include_related: bool,
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Fetch trends data using SerpAPI (more reliable than pytrends)."""
         logger.info(f"[Trends/SerpAPI] Fetching trends for: {terms}")
@@ -318,6 +318,7 @@ class TrendsModule(BaseModule):
         }
         date_param = date_map.get(timeframe, "today 12-m")
 
+        # Step 1: Fetch TIMESERIES data (supports multiple terms)
         params = {
             "engine": "google_trends",
             "q": ",".join(terms),
@@ -383,7 +384,7 @@ class TrendsModule(BaseModule):
                     else:
                         direction = "Stable"
                 else:
-                    direction = "Unknown"
+                    direction = "Insufficient Data"
 
                 summary_rows.append({
                     "term": term,
@@ -395,12 +396,80 @@ class TrendsModule(BaseModule):
 
         trend_summary = pd.DataFrame(summary_rows)
 
-        # SerpAPI doesn't provide related queries in the same call
-        # Would need separate API calls for related queries
+        # Step 2: Fetch RELATED_QUERIES (requires one call per term)
         related_df = pd.DataFrame()
+        if include_related:
+            related_rows = []
+            for term in terms:
+                try:
+                    related_for_term = await self._fetch_related_queries_serpapi(
+                        term, date_param, geo
+                    )
+                    related_rows.extend(related_for_term)
+                except Exception as e:
+                    logger.warning(f"[Trends/SerpAPI] Failed to fetch related queries for '{term}': {e}")
 
-        logger.info(f"[Trends/SerpAPI] Created summary for {len(summary_rows)} terms")
+            if related_rows:
+                related_df = pd.DataFrame(related_rows)
+
+        logger.info(f"[Trends/SerpAPI] Created summary for {len(summary_rows)} terms, "
+                    f"{len(related_df)} related queries")
         return trend_data, trend_summary, related_df
+
+    async def _fetch_related_queries_serpapi(
+        self,
+        term: str,
+        date_param: str,
+        geo: str,
+    ) -> list[dict]:
+        """Fetch related queries for a single term via SerpAPI.
+
+        SerpAPI's RELATED_QUERIES data_type only supports single terms,
+        so we call this once per term.
+        """
+        params = {
+            "engine": "google_trends",
+            "q": term,
+            "data_type": "RELATED_QUERIES",
+            "date": date_param,
+            "api_key": settings.serpapi_key,
+        }
+        if geo:
+            params["geo"] = geo
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get("https://serpapi.com/search", params=params)
+            response.raise_for_status()
+            data = response.json()
+
+        rows = []
+        related = data.get("related_queries", {})
+
+        # Top related queries
+        for item in related.get("top", [])[:5]:
+            rows.append({
+                "term": term,
+                "related_query": item.get("query", ""),
+                "query_type": "Top",
+                "value": str(item.get("value", "")),
+            })
+
+        # Rising related queries
+        for item in related.get("rising", [])[:5]:
+            value = item.get("value", "")
+            if value == "Breakout":
+                display_value = "Breakout"
+            else:
+                display_value = f"+{value}%" if isinstance(value, (int, float)) else str(value)
+            rows.append({
+                "term": term,
+                "related_query": item.get("query", ""),
+                "query_type": "Rising",
+                "value": display_value,
+            })
+
+        logger.debug(f"[Trends/SerpAPI] Found {len(rows)} related queries for '{term}'")
+        return rows
 
     def _fetch_trends_sync(
         self,
@@ -492,14 +561,17 @@ class TrendsModule(BaseModule):
                 avg = round(series.mean(), 1)
 
                 # Determine trend direction
-                recent_avg = series.tail(4).mean()  # Last ~month
-                older_avg = series.head(4).mean()  # First ~month
-                if recent_avg > older_avg * 1.1:
-                    direction = "Rising"
-                elif recent_avg < older_avg * 0.9:
-                    direction = "Declining"
+                if len(series) >= 8:
+                    recent_avg = series.tail(4).mean()  # Last ~month
+                    older_avg = series.head(4).mean()  # First ~month
+                    if recent_avg > older_avg * 1.1:
+                        direction = "Rising"
+                    elif recent_avg < older_avg * 0.9:
+                        direction = "Declining"
+                    else:
+                        direction = "Stable"
                 else:
-                    direction = "Stable"
+                    direction = "Insufficient Data"
 
                 summary_rows.append({
                     "term": term,

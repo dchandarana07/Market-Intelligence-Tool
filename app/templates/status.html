@@ -1,68 +1,63 @@
 {% extends "base.html" %}
 
-{% block title %}Running Analysis · Market Intelligence{% endblock %}
-
-{% block progress %}
-<section class="progress-shell">
-    <div class="container">
-        <ol class="progress-rail">
-            <li class="progress-node completed"><span class="node-index">1</span><div><strong>Start</strong></div></li>
-            <li class="progress-node completed"><span class="node-index">2</span><div><strong>Modules</strong></div></li>
-            <li class="progress-node completed"><span class="node-index">3</span><div><strong>Configure</strong></div></li>
-            <li class="progress-node completed"><span class="node-index">4</span><div><strong>Review</strong></div></li>
-            <li class="progress-node active"><span class="node-index">5</span><div><strong>Run</strong></div></li>
-        </ol>
-    </div>
-</section>
-{% endblock %}
+{% block title %}Generating Report &middot; Market Intelligence{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <span class="eyebrow">Live execution</span>
-    <h1>Running analysis</h1>
-    <p class="hero-lede">{{ run_info.session.topic }}</p>
-</div>
-
-<div class="panel fade-in">
-    <div id="overall-status" class="results-card">
-        <div class="loading-spinner" style="margin-bottom:18px;"></div>
-        <div id="status-text">Starting analysis...</div>
+<div class="max-w-2xl mx-auto">
+    <!-- Header -->
+    <div class="mb-6">
+        <p class="text-xs font-semibold tracking-[0.2em] uppercase text-asu-maroon dark:text-asu-gold mb-2">Live Execution</p>
+        <h1 class="text-2xl font-bold">Generating Report: "{{ run_info.session.topic }}"</h1>
     </div>
 
-    <div id="module-progress" class="status-list" style="margin-top:32px;">
+    <!-- Overall Status -->
+    <div id="overall-status" class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl p-6 text-center mb-6">
+        <div class="w-10 h-10 mx-auto mb-3 border-[3px] border-gray-200 dark:border-gray-700 border-t-asu-maroon dark:border-t-asu-gold rounded-full spinner"></div>
+        <p id="status-text" class="text-gray-500 dark:text-gray-400">Starting analysis...</p>
+    </div>
+
+    <!-- Module Progress -->
+    <div id="module-progress" class="space-y-3 mb-6">
         {% for module_name in run_info.session.selected_modules %}
-        <div id="module-{{ module_name }}" class="status-row">
+        <div id="module-{{ module_name }}" class="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-all">
             <div>
-                <div id="name-{{ module_name }}"><strong>{{ module_name | title }}</strong></div>
-                <div id="message-{{ module_name }}" class="input-hint">Waiting...</div>
+                <div id="name-{{ module_name }}" class="font-medium text-sm">{{ module_name | title }}</div>
+                <div id="message-{{ module_name }}" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Waiting...</div>
             </div>
-            <div id="icon-{{ module_name }}" class="pill">Queued</div>
+            <div id="icon-{{ module_name }}" class="text-xs px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500">Queued</div>
         </div>
         {% endfor %}
     </div>
 
-    <div id="error-display" class="alert error hidden" style="margin-top:24px;">
-        <strong>Errors detected:</strong>
-        <ul id="error-list" style="margin:10px 0 0 18px; padding:0;"></ul>
+    <!-- Error Display -->
+    <div id="error-display" class="hidden mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+        <p class="font-semibold text-red-700 dark:text-red-300 text-sm mb-2">Errors detected:</p>
+        <ul id="error-list" class="text-sm text-red-600 dark:text-red-400 list-disc ml-5 space-y-1"></ul>
     </div>
 
-    <div id="results-section" class="hidden" style="margin-top:32px;">
-        <div class="results-card">
-            <div class="icon-ring">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
-                    <path d="M5 13l4 4L19 7"></path>
-                </svg>
+    <!-- Results Section (hidden until complete) -->
+    <div id="results-section" class="hidden">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-xl p-8 text-center">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 flex items-center justify-center">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><path d="M5 13l4 4L19 7"></path></svg>
             </div>
-            <h2>Analysis complete</h2>
-            <p class="input-hint">Your results are ready in Google Sheets with full editor access.</p>
-            <a id="results-link" href="#" target="_blank" class="btn btn-primary" style="margin-top:20px;">
-                Open Google Sheet
-            </a>
+            <h2 class="text-xl font-bold mb-2" id="results-title">Analysis Complete</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Your scored report is ready in Google Sheets with full editor access.</p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a id="results-link" href="#" target="_blank" class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-asu-maroon hover:bg-asu-maroon-dark text-white font-semibold shadow-lg hover:shadow-xl transition-all">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"></path><polyline points="15,3 21,3 21,9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                    View Google Sheet
+                </a>
+                <a id="folder-link" href="#" target="_blank" class="hidden inline-flex items-center gap-2 px-5 py-3 rounded-full border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm font-medium transition">
+                    Open Drive Folder
+                </a>
+            </div>
         </div>
     </div>
 
-    <div id="new-analysis" class="hidden" style="margin-top:24px;text-align:center;">
-        <a href="/" class="link-soft">Start a new analysis</a>
+    <!-- New Analysis Link -->
+    <div id="new-analysis" class="hidden text-center mt-6">
+        <a href="/" class="text-sm text-gray-400 hover:text-asu-maroon dark:hover:text-asu-gold transition">Start a new analysis</a>
     </div>
 </div>
 
@@ -92,7 +87,6 @@
 
     function updateStatus(result) {
         const overallStatus = document.getElementById('overall-status');
-        const statusText = document.getElementById('status-text');
         const resultsSection = document.getElementById('results-section');
         const newAnalysis = document.getElementById('new-analysis');
 
@@ -104,12 +98,10 @@
 
         if (result.status === 'completed' || result.status === 'partial') {
             overallStatus.innerHTML = `
-                <div class="icon-ring" style="margin-bottom:16px;">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2">
-                        <path d="M5 13l4 4L19 7"></path>
-                    </svg>
+                <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 flex items-center justify-center">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><path d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <div class="hero-lede" style="font-size:1.2rem;">${result.status === 'completed' ? 'Analysis complete' : 'Complete with warnings'}</div>
+                <p class="font-semibold text-lg">${result.status === 'completed' ? 'Analysis Complete' : 'Complete with Warnings'}</p>
             `;
 
             if (result.output_url) {
@@ -117,15 +109,19 @@
                 resultsSection.classList.remove('hidden');
             }
 
+            if (result.output_folder_url) {
+                const folderLink = document.getElementById('folder-link');
+                folderLink.href = result.output_folder_url;
+                folderLink.classList.remove('hidden');
+            }
+
             newAnalysis.classList.remove('hidden');
         } else if (result.status === 'failed') {
             overallStatus.innerHTML = `
-                <div class="icon-ring" style="border-color:rgba(251,113,133,0.4);background:rgba(251,113,133,0.12);margin-bottom:16px;">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2">
-                        <path d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+                <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-center justify-center">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"></path></svg>
                 </div>
-                <div class="hero-lede" style="font-size:1.2rem;">Analysis failed</div>
+                <p class="font-semibold text-lg">Analysis Failed</p>
             `;
 
             if (result.errors && result.errors.length > 0) {
@@ -133,8 +129,6 @@
             }
 
             newAnalysis.classList.remove('hidden');
-        } else {
-            statusText.textContent = result.status || 'Running...';
         }
     }
 
@@ -146,41 +140,43 @@
 
         if (!moduleDiv) return;
 
-        nameDiv.innerHTML = `<strong>${moduleInfo.display_name || moduleName}</strong>`;
+        nameDiv.textContent = moduleInfo.display_name || moduleName;
         messageDiv.textContent = moduleInfo.message || moduleInfo.status;
+
+        // Reset classes
+        moduleDiv.className = 'flex items-center justify-between p-4 rounded-xl border bg-white dark:bg-gray-900 transition-all';
 
         switch (moduleInfo.status) {
             case 'running':
-                iconDiv.innerHTML = '<div class="loading-spinner" style="width:18px;height:18px;"></div>';
-                iconDiv.className = 'pill';
-                moduleDiv.className = 'status-row running';
+                moduleDiv.classList.add('border-asu-maroon/40', 'dark:border-asu-gold/40');
+                iconDiv.innerHTML = '<div class="w-5 h-5 border-2 border-gray-200 dark:border-gray-700 border-t-asu-maroon dark:border-t-asu-gold rounded-full spinner"></div>';
+                iconDiv.className = '';
                 break;
             case 'completed':
-                iconDiv.textContent = 'Complete';
-                iconDiv.className = 'pill success';
-                moduleDiv.className = 'status-row completed';
+                moduleDiv.classList.add('border-green-300', 'dark:border-green-800');
+                iconDiv.textContent = 'Done';
+                iconDiv.className = 'text-xs px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800';
                 break;
             case 'partial':
+                moduleDiv.classList.add('border-amber-300', 'dark:border-amber-800');
                 iconDiv.textContent = 'Partial';
-                iconDiv.className = 'pill warning';
-                moduleDiv.className = 'status-row';
+                iconDiv.className = 'text-xs px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800';
                 break;
             case 'failed':
+                moduleDiv.classList.add('border-red-300', 'dark:border-red-800');
                 iconDiv.textContent = 'Failed';
-                iconDiv.className = 'pill danger';
-                moduleDiv.className = 'status-row failed';
+                iconDiv.className = 'text-xs px-3 py-1 rounded-full bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800';
                 break;
             default:
+                moduleDiv.classList.add('border-gray-200', 'dark:border-gray-800');
                 iconDiv.textContent = 'Queued';
-                iconDiv.className = 'pill';
-                moduleDiv.className = 'status-row';
+                iconDiv.className = 'text-xs px-3 py-1 rounded-full border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500';
         }
     }
 
     function showError(errors) {
         const errorDisplay = document.getElementById('error-display');
         const errorList = document.getElementById('error-list');
-
         errorList.innerHTML = errors.map(e => `<li>${e}</li>`).join('');
         errorDisplay.classList.remove('hidden');
     }

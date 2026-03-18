@@ -13,9 +13,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
     # Routes that don't require authentication
     EXCLUDED_PATHS = [
         "/auth/login",
+        "/auth/callback-init",
         "/auth/callback",
         "/static",
         "/health",
+        "/api/",
     ]
 
     async def dispatch(self, request: Request, call_next):

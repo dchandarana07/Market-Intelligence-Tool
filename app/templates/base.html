@@ -1,56 +1,67 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Market Intelligence{% endblock %}</title>
     <script>
         (function() {
-            const storageKey = 'mi-theme';
-            let saved = null;
-            try {
-                saved = localStorage.getItem(storageKey);
-            } catch (err) {
-                saved = null;
-            }
-            const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const theme = saved || (prefersDark ? 'dark' : 'light');
-            document.documentElement.dataset.theme = theme;
+            const saved = localStorage.getItem('mi-theme');
+            if (saved === 'light') document.documentElement.classList.remove('dark');
         })();
     </script>
-    <link rel="stylesheet" href="/static/css/custom.css?v=5">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        asu: {
+                            maroon: '#8C1D40',
+                            gold: '#FFC627',
+                            'maroon-dark': '#6B1530',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner { animation: spin 1s linear infinite; }
+        body { font-family: "SF Pro Display", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif; }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body class="app-shell">
-    <div class="background-grid"></div>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen flex flex-col antialiased">
 
-    <header class="app-nav">
-        <div class="container nav-inner">
-            <a href="/" class="brand-block">
-                <div class="brand-logo">LI</div>
-                <div class="brand-text-stack">
-                    <span class="brand-line-1">Learning Innovations</span>
-                    <span class="brand-line-2">Market Research Console</span>
+    <!-- Navigation -->
+    <header class="sticky top-0 z-50 backdrop-blur-xl bg-white/80 dark:bg-gray-950/80 border-b border-gray-200 dark:border-gray-800">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+            <a href="/" class="flex items-center gap-3 no-underline">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-asu-maroon to-asu-gold flex items-center justify-center text-white font-bold text-sm shadow-lg">MI</div>
+                <div class="hidden sm:block leading-tight">
+                    <div class="text-sm font-bold tracking-wider uppercase text-gray-900 dark:text-gray-100">Market Intelligence</div>
+                    <div class="text-xs font-medium tracking-wider uppercase text-gray-500 dark:text-gray-400">ASU Learning Enterprise</div>
                 </div>
             </a>
 
-            <div class="nav-user">
-                <button type="button" id="themeToggle" class="btn btn-ghost mode-btn" aria-label="Switch to light mode">
-                    Light Mode
+            <div class="flex items-center gap-3">
+                <button type="button" id="themeToggle" class="text-sm px-3 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                    <span class="dark:hidden">Dark</span>
+                    <span class="hidden dark:inline">Light</span>
                 </button>
-
                 {% if user %}
-                <div class="user-pill">
+                <div class="flex items-center gap-2 pl-3 pr-4 py-2 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
                     {% if user.picture %}
-                    <img src="{{ user.picture }}" alt="{{ user.name }}" class="avatar">
+                    <img src="{{ user.picture }}" alt="{{ user.name }}" class="w-7 h-7 rounded-full object-cover">
                     {% else %}
-                    <div class="avatar">{{ user.name[0] if user and user.name else 'U' }}</div>
+                    <div class="w-7 h-7 rounded-full bg-asu-maroon text-white flex items-center justify-center text-xs font-bold">{{ user.name[0] if user and user.name else 'U' }}</div>
                     {% endif %}
-                    <div class="user-meta">
-                        <strong>{{ user.name }}</strong>
-                    </div>
+                    <span class="text-sm font-medium hidden sm:inline">{{ user.name }}</span>
                 </div>
-                <a href="/auth/logout" class="btn btn-ghost">Sign Out</a>
+                <a href="/auth/logout" class="text-sm text-gray-500 hover:text-asu-maroon dark:hover:text-asu-gold transition">Sign Out</a>
                 {% endif %}
             </div>
         </div>
@@ -58,15 +69,15 @@
 
     {% block progress %}{% endblock %}
 
-    <main class="app-main">
-        <div class="container content-wrap">
+    <main class="flex-1">
+        <div class="max-w-6xl mx-auto px-6 py-8">
             {% block content %}{% endblock %}
         </div>
     </main>
 
-    <footer>
-        <div class="container footer-inner" style="justify-content: center; text-align: center;">
-            <div>© 2025 Market Intelligence · Learning Enterprise · Arizona State University</div>
+    <footer class="border-t border-gray-200 dark:border-gray-800 py-8 mt-12">
+        <div class="max-w-6xl mx-auto px-6 text-center text-sm text-gray-400 dark:text-gray-500">
+            &copy; 2025 Market Intelligence &middot; Learning Enterprise &middot; Arizona State University
         </div>
     </footer>
 
@@ -75,32 +86,12 @@
             const root = document.documentElement;
             const toggle = document.getElementById('themeToggle');
             if (!toggle) return;
-            const storageKey = 'mi-theme';
-
-            const storeTheme = (theme) => {
-                try {
-                    localStorage.setItem(storageKey, theme);
-                } catch (err) {}
-            };
-
-            const updateButton = () => {
-                const current = root.dataset.theme || 'dark';
-                const label = current === 'dark' ? 'Light Mode' : 'Dark Mode';
-                toggle.textContent = label;
-                toggle.setAttribute('aria-label', `Switch to ${label.toLowerCase()}`);
-            };
-
-            updateButton();
-
             toggle.addEventListener('click', () => {
-                const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-                root.dataset.theme = next;
-                storeTheme(next);
-                updateButton();
+                root.classList.toggle('dark');
+                localStorage.setItem('mi-theme', root.classList.contains('dark') ? 'dark' : 'light');
             });
         })();
     </script>
-
     {% block extra_js %}{% endblock %}
 </body>
 </html>
