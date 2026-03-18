@@ -35,10 +35,13 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-logging.getLogger("app").setLevel(logging.DEBUG)
+logging.getLogger("app").setLevel(logging.DEBUG if settings.debug else logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("googleapiclient").setLevel(logging.WARNING)
+logging.getLogger("multipart").setLevel(logging.WARNING)
+logging.getLogger("requests_oauthlib").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 

@@ -77,23 +77,11 @@ class GoogleSheetsService:
             logger.info("Loading Google credentials from environment variable")
 
             try:
-                # Try to parse JSON as-is
-                credentials_info = json.loads(settings.google_credentials_json)
+                credentials_info = self._parse_credentials_json(settings.google_credentials_json)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse Google credentials JSON: {e}")
-
-                # Provide clear error message with instructions
                 raise ValueError(
-                    "Invalid JSON in GOOGLE_CREDENTIALS_JSON environment variable. "
-                    f"Error: {str(e)}\n\n"
-                    "Common causes:\n"
-                    "1. JSON contains formatting newlines/tabs (should be minified to single line)\n"
-                    "2. JSON contains unescaped control characters\n"
-                    "3. JSON was copy-pasted incorrectly\n\n"
-                    "Solutions:\n"
-                    "1. Minify your JSON to a single line: https://codebeautify.org/jsonminifier\n"
-                    "2. Or use Render's 'Secret File' feature to upload the JSON file\n"
-                    "3. Or place credentials file at: credentials/google-credentials.json"
+                    f"Invalid JSON in GOOGLE_CREDENTIALS_JSON: {e}"
                 ) from e
 
             return Credentials.from_service_account_info(credentials_info, scopes=SCOPES)
@@ -120,13 +108,29 @@ class GoogleSheetsService:
         )
         return has_credentials and settings.google_drive_folder_id != ""
 
+    def _parse_credentials_json(self, raw: str) -> dict:
+        """Parse credentials JSON, handling Render env var formatting quirks."""
+        import json
+        import re
+
+        raw = raw.strip()
+        if (raw.startswith('"') and raw.endswith('"')) or \
+           (raw.startswith("'") and raw.endswith("'")):
+            raw = raw[1:-1]
+
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            cleaned = raw.replace('\r\n', '\\n').replace('\r', '\\n')
+            cleaned = re.sub(r'(?<!\\)\n', '\\n', cleaned)
+            cleaned = cleaned.replace('\t', '\\t')
+            return json.loads(cleaned)
+
     def get_service_account_email(self) -> Optional[str]:
         """Get the service account email for sharing folders."""
-        import json
-
         # Try environment variable first
         if settings.google_credentials_json:
-            data = json.loads(settings.google_credentials_json)
+            data = self._parse_credentials_json(settings.google_credentials_json)
             return data.get("client_email")
 
         # Fall back to file
