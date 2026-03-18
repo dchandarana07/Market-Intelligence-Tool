@@ -55,6 +55,16 @@ STATIC_DIR = BASE_DIR / "static"
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     logger.info("Starting Market Intelligence Tool")
+    # Validate Google credentials at startup
+    try:
+        sheets = get_sheets_service()
+        if sheets.is_available():
+            email = sheets.get_service_account_email()
+            logger.info(f"Google Sheets service OK. Service account: {email}")
+        else:
+            logger.warning("Google Sheets service not configured")
+    except Exception as e:
+        logger.error(f"Google Sheets startup check FAILED: {e}")
     yield
     logger.info("Shutting down Market Intelligence Tool")
 

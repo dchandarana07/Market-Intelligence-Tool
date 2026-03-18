@@ -111,20 +111,81 @@ class GoogleSheetsService:
     def _parse_credentials_json(self, raw: str) -> dict:
         """Parse credentials JSON, handling Render env var formatting quirks."""
         import json
-        import re
 
         raw = raw.strip()
+        # Strip outer quotes if Render wraps the value
         if (raw.startswith('"') and raw.endswith('"')) or \
            (raw.startswith("'") and raw.endswith("'")):
             raw = raw[1:-1]
 
+        # Nuclear approach: extract fields individually if json.loads fails
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            cleaned = raw.replace('\r\n', '\\n').replace('\r', '\\n')
-            cleaned = re.sub(r'(?<!\\)\n', '\\n', cleaned)
-            cleaned = cleaned.replace('\t', '\\t')
+            pass
+
+        # The private_key field contains \\n that may become real newlines.
+        # Strategy: extract private key, replace it with placeholder, parse, re-insert.
+        import re
+
+        # Find the private_key value (between quotes, may span multiple lines)
+        pk_match = re.search(r'"private_key"\s*:\s*"(.*?)"(?=\s*[,}])', raw, re.DOTALL)
+        if pk_match:
+            original_pk = pk_match.group(1)
+            # Clean the private key: normalize all whitespace to proper \\n
+            clean_pk = original_pk.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
+            # Remove any extra spaces that crept in (like line-wrapped indentation)
+            clean_pk = re.sub(r'\\n\s+', '\\n', clean_pk)
+            # Replace in raw
+            cleaned = raw[:pk_match.start(1)] + clean_pk + raw[pk_match.end(1):]
+        else:
+            cleaned = raw
+
+        # Also clean any stray newlines outside private_key
+        # Split on private_key boundary to avoid double-cleaning
+        cleaned = cleaned.replace('\r\n', ' ').replace('\r', ' ')
+        # Replace newlines that aren't inside the private key (already handled above)
+        parts = cleaned.split('"private_key"')
+        if len(parts) == 2:
+            parts[0] = parts[0].replace('\n', ' ')
+            # For part after private_key, only replace newlines after the closing quote
+            pk_end = parts[1].find('-----END')
+            if pk_end != -1:
+                after_pk = parts[1][pk_end:]
+                after_pk_quote = after_pk.find('"')
+                if after_pk_quote != -1:
+                    rest_start = pk_end + after_pk_quote
+                    parts[1] = parts[1][:rest_start] + parts[1][rest_start:].replace('\n', ' ')
+            cleaned = '"private_key"'.join(parts)
+        else:
+            cleaned = cleaned.replace('\n', ' ')
+
+        try:
             return json.loads(cleaned)
+        except json.JSONDecodeError:
+            # Last resort: build the dict manually from known fields
+            logger.warning("JSON parsing failed, attempting manual field extraction")
+            fields = {}
+            for field in ["type", "project_id", "private_key_id", "private_key",
+                          "client_email", "client_id", "auth_uri", "token_uri",
+                          "auth_provider_x509_cert_url", "client_x509_cert_url",
+                          "universe_domain"]:
+                if field == "private_key":
+                    m = re.search(r'"private_key"\s*:\s*"(.*?)"(?=\s*[,}])', cleaned, re.DOTALL)
+                else:
+                    m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', cleaned)
+                if m:
+                    fields[field] = m.group(1)
+
+            if "private_key" in fields:
+                # Ensure \\n are actual newlines in the key
+                fields["private_key"] = fields["private_key"].replace('\\n', '\n')
+
+            if fields.get("type") and fields.get("private_key"):
+                logger.info("Successfully extracted credentials via manual parsing")
+                return fields
+
+            raise json.JSONDecodeError("Could not parse credentials JSON", raw, 0)
 
     def get_service_account_email(self) -> Optional[str]:
         """Get the service account email for sharing folders."""
