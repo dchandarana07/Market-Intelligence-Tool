@@ -889,14 +889,52 @@ class PipelineOrchestrator:
             logger.info(f"Successfully created spreadsheet: {output_info.get('spreadsheet_url')}")
             return output_info
         except Exception as e:
-            logger.error(f"Failed to create spreadsheet: {e}", exc_info=True)
-            return {
-                "spreadsheet_id": None,
-                "spreadsheet_url": None,
-                "folder_url": None,
-                "shared_with": [],
-                "error": str(e),
-            }
+            logger.error(f"Google Sheets failed: {e}, falling back to XLSX download")
+
+            # FALLBACK: Save as local XLSX file for download
+            try:
+                return self._save_xlsx_fallback(title, all_data, run.run_id)
+            except Exception as xlsx_err:
+                logger.error(f"XLSX fallback also failed: {xlsx_err}", exc_info=True)
+                return {
+                    "spreadsheet_id": None,
+                    "spreadsheet_url": None,
+                    "folder_url": None,
+                    "shared_with": [],
+                    "error": str(e),
+                }
+
+    def _save_xlsx_fallback(
+        self, title: str, all_data: dict[str, pd.DataFrame], run_id: str
+    ) -> dict:
+        """Save report as XLSX file for download when Google Sheets fails."""
+        import os
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+        filename = f"{title.replace(' ', '_')}_{timestamp}.xlsx"
+
+        # Ensure downloads directory exists
+        downloads_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "downloads")
+        os.makedirs(downloads_dir, exist_ok=True)
+
+        filepath = os.path.join(downloads_dir, filename)
+
+        with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
+            for sheet_name, df in all_data.items():
+                # Excel sheet names max 31 chars
+                safe_name = sheet_name[:31]
+                df.to_excel(writer, sheet_name=safe_name, index=False)
+
+        download_url = f"/static/downloads/{filename}"
+        logger.info(f"XLSX fallback saved: {filepath}")
+
+        return {
+            "spreadsheet_id": None,
+            "spreadsheet_url": download_url,
+            "folder_url": None,
+            "shared_with": [],
+            "xlsx_fallback": True,
+        }
 
     def _notify_progress(self, run_id: str, progress: ModuleProgress) -> None:
         """Notify progress callback if configured."""

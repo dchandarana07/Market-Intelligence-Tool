@@ -105,7 +105,13 @@
             `;
 
             if (result.output_url) {
-                document.getElementById('results-link').href = result.output_url;
+                const link = document.getElementById('results-link');
+                link.href = result.output_url;
+                // If it's an XLSX download (local file), update link text
+                if (result.output_url.includes('/static/downloads/')) {
+                    link.textContent = 'Download Excel Report';
+                    link.setAttribute('download', '');
+                }
                 resultsSection.classList.remove('hidden');
             }
 

@@ -382,8 +382,8 @@ async def execute_pipeline(request: Request, run_id: str):
                 "message": progress.message,
             }
 
-        # Send email notification
-        if result.output_url:
+        # Send email notification (only for Google Sheets links, not local downloads)
+        if result.output_url and not result.output_url.startswith("/static/"):
             try:
                 email_service = get_email_service()
                 email_service.send_results_email(
