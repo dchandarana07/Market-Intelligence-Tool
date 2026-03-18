@@ -109,83 +109,91 @@ class GoogleSheetsService:
         return has_credentials and settings.google_drive_folder_id != ""
 
     def _parse_credentials_json(self, raw: str) -> dict:
-        """Parse credentials JSON, handling Render env var formatting quirks."""
+        """Parse credentials JSON, handling Render env var formatting quirks.
+
+        Render can mangle the JSON by:
+        1. Wrapping value in outer quotes
+        2. Inserting real newlines + spaces into the private key (line wrapping)
+        3. Even breaking PEM markers like '-----END PRIVATE \\n  KEY-----'
+        """
         import json
+        import re
+        import base64
 
         raw = raw.strip()
-        # Strip outer quotes if Render wraps the value
+        # Strip outer quotes
         if (raw.startswith('"') and raw.endswith('"')) or \
            (raw.startswith("'") and raw.endswith("'")):
             raw = raw[1:-1]
 
-        # Nuclear approach: extract fields individually if json.loads fails
         try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
+            result = json.loads(raw)
+            # Validate private key works
+            if result.get("private_key"):
+                self._validate_private_key(result["private_key"])
+            return result
+        except (json.JSONDecodeError, ValueError):
             pass
 
-        # The private_key field contains \\n that may become real newlines.
-        # Strategy: extract private key, replace it with placeholder, parse, re-insert.
-        import re
+        # NUCLEAR FIX: Extract all fields manually, rebuild private key from scratch
+        logger.warning("Standard JSON parse failed, using nuclear field extraction")
 
-        # Find the private_key value (between quotes, may span multiple lines)
-        pk_match = re.search(r'"private_key"\s*:\s*"(.*?)"(?=\s*[,}])', raw, re.DOTALL)
+        # Step 1: Extract the private key raw content (everything between BEGIN and END markers)
+        # The markers themselves may be broken by Render's line wrapping
+        pk_match = re.search(
+            r'-----\s*BEGIN\s+PRIVATE\s+KEY\s*-----(.+?)-----\s*END\s+PRIVATE\s+KEY\s*-----',
+            raw, re.DOTALL
+        )
+
+        clean_pk = None
         if pk_match:
-            original_pk = pk_match.group(1)
-            # Clean the private key: normalize all whitespace to proper \\n
-            clean_pk = original_pk.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
-            # Remove any extra spaces that crept in (like line-wrapped indentation)
-            clean_pk = re.sub(r'\\n\s+', '\\n', clean_pk)
-            # Replace in raw
-            cleaned = raw[:pk_match.start(1)] + clean_pk + raw[pk_match.end(1):]
-        else:
-            cleaned = raw
+            pk_body = pk_match.group(1)
+            # Strip ALL whitespace (newlines, spaces, tabs, \\n literals)
+            pk_body = pk_body.replace('\\n', '')  # Remove literal \n
+            pk_body = re.sub(r'\s+', '', pk_body)  # Remove all whitespace
+            # Validate it's valid base64
+            try:
+                base64.b64decode(pk_body)
+                # Rebuild proper PEM with 64-char lines
+                lines = [pk_body[i:i+64] for i in range(0, len(pk_body), 64)]
+                clean_pk = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(lines) + "\n-----END PRIVATE KEY-----\n"
+                logger.info("Private key reconstructed successfully")
+            except Exception:
+                logger.error("Private key base64 validation failed")
 
-        # Also clean any stray newlines outside private_key
-        # Split on private_key boundary to avoid double-cleaning
-        cleaned = cleaned.replace('\r\n', ' ').replace('\r', ' ')
-        # Replace newlines that aren't inside the private key (already handled above)
-        parts = cleaned.split('"private_key"')
-        if len(parts) == 2:
-            parts[0] = parts[0].replace('\n', ' ')
-            # For part after private_key, only replace newlines after the closing quote
-            pk_end = parts[1].find('-----END')
-            if pk_end != -1:
-                after_pk = parts[1][pk_end:]
-                after_pk_quote = after_pk.find('"')
-                if after_pk_quote != -1:
-                    rest_start = pk_end + after_pk_quote
-                    parts[1] = parts[1][:rest_start] + parts[1][rest_start:].replace('\n', ' ')
-            cleaned = '"private_key"'.join(parts)
-        else:
-            cleaned = cleaned.replace('\n', ' ')
+        # Step 2: Extract all other fields (simple string values, no newline issues)
+        # Remove all real newlines/extra whitespace first for non-PK fields
+        flat = raw.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
+        flat = re.sub(r'\s+', ' ', flat)
 
-        try:
-            return json.loads(cleaned)
-        except json.JSONDecodeError:
-            # Last resort: build the dict manually from known fields
-            logger.warning("JSON parsing failed, attempting manual field extraction")
-            fields = {}
-            for field in ["type", "project_id", "private_key_id", "private_key",
-                          "client_email", "client_id", "auth_uri", "token_uri",
-                          "auth_provider_x509_cert_url", "client_x509_cert_url",
-                          "universe_domain"]:
-                if field == "private_key":
-                    m = re.search(r'"private_key"\s*:\s*"(.*?)"(?=\s*[,}])', cleaned, re.DOTALL)
-                else:
-                    m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', cleaned)
-                if m:
-                    fields[field] = m.group(1)
+        fields = {}
+        for field in ["type", "project_id", "private_key_id",
+                      "client_email", "client_id", "auth_uri", "token_uri",
+                      "auth_provider_x509_cert_url", "client_x509_cert_url",
+                      "universe_domain"]:
+            m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', flat)
+            if m:
+                fields[field] = m.group(1)
 
-            if "private_key" in fields:
-                # Ensure \\n are actual newlines in the key
-                fields["private_key"] = fields["private_key"].replace('\\n', '\n')
+        if clean_pk:
+            fields["private_key"] = clean_pk
 
-            if fields.get("type") and fields.get("private_key"):
-                logger.info("Successfully extracted credentials via manual parsing")
-                return fields
+        if fields.get("type") and fields.get("private_key") and fields.get("client_email"):
+            logger.info(f"Nuclear extraction successful: {fields.get('client_email')}")
+            return fields
 
-            raise json.JSONDecodeError("Could not parse credentials JSON", raw, 0)
+        raise ValueError("Could not extract credentials from GOOGLE_CREDENTIALS_JSON")
+
+    def _validate_private_key(self, key: str) -> None:
+        """Validate a PEM private key can be decoded."""
+        import base64
+        # Extract base64 content between PEM markers
+        lines = key.strip().split('\n')
+        b64_content = ''.join(
+            line for line in lines
+            if not line.startswith('-----')
+        )
+        base64.b64decode(b64_content)  # Raises on invalid
 
     def get_service_account_email(self) -> Optional[str]:
         """Get the service account email for sharing folders."""
